@@ -1,0 +1,15 @@
+server:
+  port: ${USER-SERVICE-PORT:3000}
+
+spring:
+  application:
+    name: USER-SERVICE
+  main:
+    banner-mode: off
+  jackson:
+    default-property-inclusion: non_null
+  config:
+    import: classpath:db-config.yaml, security-config.yaml
+
+users:
+  default-roles:

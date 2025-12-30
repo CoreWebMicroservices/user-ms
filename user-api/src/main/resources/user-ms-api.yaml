@@ -1,0 +1,615 @@
+openapi: 3.0.3
+info:
+  title: CoreMs Auth Service API
+  description: |
+    The Authentication Service API allows users to verify the identity of a user.
+    In response user gets access JWT token. 
+    
+    Authentication service provides oauth2 authentication/registration via popular providers +  JWT Authentication with user login password.
+  version: 1.0.0
+
+
+servers:
+  - url: /
+    description: Default server
+
+tags:
+  - name: Authentication
+  - name: User
+  - name: Profile
+
+x-common-error-responses: &common-error-responses
+  '400':
+    $ref: '.gen/common-api.yaml#/components/responses/ValidationError'
+  '401':
+    $ref: '.gen/common-api.yaml#/components/responses/UnauthorizedError'
+  '404':
+    $ref: '.gen/common-api.yaml#/components/responses/NotFoundError'
+  '500':
+    $ref: '.gen/common-api.yaml#/components/responses/InternalServerError'
+
+# Require bearer auth for all operations by default
+security:
+  - bearerAuth: []
+
+paths:
+  /api/auth/signin:
+    post:
+      tags:
+        - Authentication
+      summary: Sign in with email and password
+      operationId: signIn
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignInRequest'
+
+      responses:
+        '200':
+          description: Sign In successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        <<: *common-error-responses
+
+  /api/auth/signout:
+    post:
+      tags:
+        - Authentication
+      summary: Sign out
+      operationId: signOut
+
+      responses:
+        '200':
+          description: Sign Out successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/auth/refresh-token:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh Token
+      operationId: refreshToken
+
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessTokenResponse'
+        <<: *common-error-responses
+
+  /api/auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: Sign up with email and password
+      operationId: signUp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+
+      responses:
+        '201':
+          description: Sign Up successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/profile:
+    get:
+      tags:
+        - Profile
+      summary: Returns current logged user profile
+      operationId: currentUserInfo
+
+      responses:
+        '200':
+          description: User profile response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        <<: *common-error-responses
+
+    patch:
+      tags:
+        - Profile
+      summary: Update current user's profile (partial)
+      operationId: updateCurrentUserProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdateRequest'
+
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        <<: *common-error-responses
+
+  /api/profile/change-password:
+    post:
+      tags:
+        - Profile
+      summary: Change password for current user
+      operationId: changeOwnPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/users:
+    get:
+      tags:
+        - User
+      summary: Returns all users
+      operationId: getAllUsers
+      parameters:
+        - $ref: '.gen/common-api.yaml#/components/parameters/page'
+        - $ref: '.gen/common-api.yaml#/components/parameters/pageSize'
+        - $ref: '.gen/common-api.yaml#/components/parameters/sort'
+        - $ref: '.gen/common-api.yaml#/components/parameters/search'
+        - $ref: '.gen/common-api.yaml#/components/parameters/filter'
+
+      responses:
+        '200':
+          description: User list response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersPagedResponse'
+        <<: *common-error-responses
+
+    post:
+      tags:
+        - User
+      summary: Create new user
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/users/{userId}:
+    get:
+      tags:
+        - User
+      summary: Returns a user by ID
+      operationId: getUserById
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID of the user to return
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: User info response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfo'
+        <<: *common-error-responses
+    put:
+      tags:
+        - User
+      summary: Update a user by ID
+      operationId: updateUserById
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID of the user to update
+          schema:
+            type: string
+            format: uuid
+
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserInfo'
+
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+    delete:
+      tags:
+        - User
+      summary: Delete a user by ID
+      operationId: deleteUserById
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: ID of the user to delete
+          schema:
+            type: string
+            format: uuid
+
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/users/{userId}/change-password:
+    post:
+      tags:
+        - User
+      summary: Admin set/change password for a user
+      operationId: adminChangeUserPassword
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminSetPasswordRequest'
+      responses:
+        '200':
+          description: Password changed by admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/users/{userId}/change-email:
+    post:
+      tags:
+        - User
+      summary: Admin change user's email (immediate)
+      operationId: adminChangeUserEmail
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeEmailRequest'
+      responses:
+        '200':
+          description: Email changed by admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+components:
+  schemas:
+    UsersPagedResponse:
+      allOf:
+        - $ref: '.gen/common-api.yaml#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserInfo'
+
+    SignInRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: The user's email address
+          maxLength: 254
+          example: user@example.com
+        password:
+          type: string
+          description: The user's password
+          example: StrongPass1!
+
+    CreateUserRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          description: The user's first name
+          maxLength: 100
+          example: John
+        lastName:
+          type: string
+          description: The user's last name
+          maxLength: 100
+          example: Doe
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{1,20}$'
+          maxLength: 20
+          description: E.164 phone number for the user (e.g. +15551234567)
+          example: +15551234567
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: The user's email address
+          example: user@example.com
+        roles:
+          type: array
+          description: List of roles assigned to the user
+          items:
+            type: string
+          example: [ "USER", "ADMIN" ]
+
+    SignUpRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          description: The user's first name
+          maxLength: 100
+          example: John
+        lastName:
+          type: string
+          description: The user's last name
+          maxLength: 100
+          example: Doe
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: The user's email address
+          example: user@example.com
+        password:
+          type: string
+          description: The user's password
+          minLength: 8
+          maxLength: 128
+          # enable the following pattern to enforce password complexity
+          # pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$'
+          format: password
+          example: StrongPass1!
+        confirmPassword:
+          type: string
+          description: Confirmation of the user's password, should match the password field
+          minLength: 8
+          maxLength: 128
+          example: StrongPass1!
+        imageUrl:
+          type: string
+          maxLength: 2048
+          description: Optional URL to the user's profile image
+          example: https://example.com/images/johndoe.jpg
+      required:
+        - email
+        - confirmPassword
+        - firstName
+        - lastName
+
+    UserInfo:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: The user's ID
+          format: uuid
+          example: 2a3e0b5c-2192-4612-9e02-693989dbb7e5
+        provider:
+          type: string
+          description: The authentication provider (e.g., local, google, github)
+          example: local
+        firstName:
+          type: string
+          description: The user's first name
+          maxLength: 100
+          example: John
+        lastName:
+          type: string
+          description: The user's last name
+          maxLength: 100
+          example: Doe
+        email:
+          type: string
+          description: The user's email address
+          format: email
+          maxLength: 254
+          example: user@example.com
+        imageUrl:
+          type: string
+          description: Optional URL to the user's profile image
+          maxLength: 2048
+          example: https://example.com/images/johndoe.jpg
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{1,20}$'
+          maxLength: 20
+          description: E.164 phone number for the user (e.g. +15551234567). May be null if not provided.
+        roles:
+          type: array
+          description: List of roles assigned to the user
+          items:
+            type: string
+          example: ["USER", "ADMIN"]
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the user was created
+          example: '2024-01-01T12:00:00Z'
+        updatedAt:
+          type: string
+          format: date-time
+          description: Timestamp when the user was last updated
+          example: '2024-01-01T12:00:00Z'
+        lastLoginAt:
+          type: string
+          format: date-time
+          description: Timestamp when the user last logged in
+          example: '2024-01-15T08:30:00Z'
+
+    TokenResponse:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+          description: The JWT token
+          example: eyJ0eXAiOiJyZWZyZXNoX3Rva2VuIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIyYTNlMGI1Yy0yMTkyLTQ2MTItOWUwMi02OTM5ODlkYmI3ZTUiLCJlbWFpbCI6ImRpbWFAdGVzdC5jb20iLCJyb2xlcyI6WyJVU0VSIl0sInVzZXJfbmFtZSI6IkRpbWEgTWlzaGNoZW5rbyIsImlhdCI6MTcyNjA4Njg2OSwiZXhwIjoxNzI2MTczMjY5fQ.CXzPiYXtC8ORdDuLRJW_OPCv7K-VpuvWztEENnpfu5HlIZUOw7FA2-uUAjpEOKnytKk-cI_1EuP7L97pvqNrsw
+        accessToken:
+          type: string
+          description: The JWT token
+          example: eyJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyYTNlMGI1Yy0yMTkyLTQ2MTItOWUwMi02OTM5ODlkYmI3ZTUiLCJlbWFpbCI6ImRpbWFAdGVzdC5jb20iLCJyb2xlcyI6WyJVU0VSIl0sInVzZXJfbmFtZSI6IkRpbWEgTWlzaGNoZW5rbyIsImlhdCI6MTcyNjA4Njg2OSwiZXhwIjoxNzI2MDg3NDY5fQ.JlBrDUBzosO1k-vpODQF6xfhSyn-E7jj1VjxFPyYU50PwP0u0a9u2E3-7WNLq_kb5XgQ3Y0rRzmqFO-TmT1Wng
+
+    AccessTokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          description: The JWT token
+          example: eyJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyYTNlMGI1Yy0yMTkyLTQ2MTItOWUwMi02OTM5ODlkYmI3ZTUiLCJlbWFpbCI6ImRpbWFAdGVzdC5jb20iLCJyb2xlcyI6WyJVU0VSIl0sInVzZXJfbmFtZSI6IkRpbWEgTWlzaGNoZW5rbyIsImlhdCI6MTcyNjA4Njg2OSwiZXhwIjoxNzI2MDg3NDY5fQ.JlBrDUBzosO1k-vpODQF6xfhSyn-E7jj1VjxFPyYU50PwP0u0a9u2E3-7WNLq_kb5XgQ3Y0rRzmqFO-TmT1Wng
+
+    UserProfileUpdateRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          example: John
+        lastName:
+          type: string
+          example: Doe
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{1,20}$'
+          maxLength: 20
+
+        imageUrl:
+          type: string
+          example: https://example.com/images/johndoe.jpg
+
+    ChangePasswordRequest:
+      type: object
+      required:
+        - oldPassword
+        - newPassword
+        - confirmPassword
+      properties:
+        oldPassword:
+          type: string
+          description: Current password
+          minLength: 8
+          maxLength: 128
+        newPassword:
+          type: string
+          description: New password
+          minLength: 8
+          maxLength: 128
+        confirmPassword:
+          type: string
+          description: Confirmation of the new password, should match newPassword
+          minLength: 8
+          maxLength: 128
+
+    AdminSetPasswordRequest:
+      type: object
+      required:
+        - newPassword
+        - confirmPassword
+      properties:
+        newPassword:
+          type: string
+          description: New password to set for the user (admin)
+          minLength: 8
+          maxLength: 128
+        confirmPassword:
+          type: string
+          description: Confirmation of the new password, should match newPassword
+          minLength: 8
+          maxLength: 128
+
+    ChangeEmailRequest:
+      type: object
+      required:
+        - newEmail
+      properties:
+        newEmail:
+          type: string
+          format: email
+          maxLength: 254
+          description: New email address
+          example: user+new@example.com
+
+    ResetPasswordRequest:
+      type: object
+      properties:
+        emailTemplate:
+          type: string
+          description: Optional template id used when sending reset link
+          example: default-reset-template
+
+    SuccessfulResponse:
+      $ref: '.gen/common-api.yaml#/components/schemas/SuccessfulResponse'
+
+  securitySchemes:
+    bearerAuth:
+      $ref: '.gen/common-api.yaml#/components/securitySchemes/bearerAuth'
