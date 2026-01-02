@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,6 +26,7 @@ import java.util.UUID;
 public class LoginTokenEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
+    @SequenceGenerator(name = "login_token_seq", sequenceName = "login_token_seq", allocationSize = 1)
     @Column(unique = true)
     private Integer id;
 
