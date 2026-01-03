@@ -10,6 +10,8 @@ services:
     environment:
       # Override database URL to use host.docker.internal for Docker
       - DATABASE_URL=jdbc:postgresql://host.docker.internal:5432/corems
+      # Override communication service URL for Docker
+      - COMMUNICATION-SERVICE-BASE-URL=http://communication-ms:3001
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:

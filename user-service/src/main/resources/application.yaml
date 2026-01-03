@@ -11,5 +11,8 @@ spring:
   config:
     import: classpath:db-config.yaml, security-config.yaml
 
+communicationms.base-url: ${COMMUNICATION-SERVICE-BASE-URL:http://localhost:3001}
+
 users:
   default-roles:
+    - USER_MS_USER
