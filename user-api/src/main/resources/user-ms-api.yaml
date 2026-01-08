@@ -93,6 +93,7 @@ paths:
         - Authentication
       summary: Sign up with email and password
       operationId: signUp
+      security: []  # No auth required for signup
       requestBody:
         required: true
         content:
@@ -103,6 +104,75 @@ paths:
       responses:
         '201':
           description: Sign Up successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/auth/verify-email:
+    post:
+      tags:
+        - Authentication
+      summary: Verify email address with confirmation token
+      operationId: verifyEmail
+      security: []  # No auth required for verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyEmailRequest'
+
+      responses:
+        '200':
+          description: Email verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/auth/verify-phone:
+    post:
+      tags:
+        - Authentication
+      summary: Verify phone number with confirmation code
+      operationId: verifyPhone
+      security: []  # No auth required for verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPhoneRequest'
+
+      responses:
+        '200':
+          description: Phone verified successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/auth/resend-verification:
+    post:
+      tags:
+        - Authentication
+      summary: Resend verification code/link
+      operationId: resendVerification
+      security: []  # No auth required for resend
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendVerificationRequest'
+
+      responses:
+        '200':
+          description: Verification code/link sent successfully
           content:
             application/json:
               schema:
@@ -438,6 +508,12 @@ components:
           minLength: 8
           maxLength: 128
           example: StrongPass1!
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{1,20}$'
+          maxLength: 20
+          description: Optional E.164 phone number for the user (e.g. +15551234567)
+          example: +15551234567
         imageUrl:
           type: string
           maxLength: 2048
@@ -445,9 +521,63 @@ components:
           example: https://example.com/images/johndoe.jpg
       required:
         - email
+        - password
         - confirmPassword
         - firstName
         - lastName
+
+    VerifyEmailRequest:
+      type: object
+      required:
+        - email
+        - token
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: The user's email address
+          example: user@example.com
+        token:
+          type: string
+          description: Email verification token received via email
+          example: abc123def456
+
+    VerifyPhoneRequest:
+      type: object
+      required:
+        - phoneNumber
+        - code
+      properties:
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{1,20}$'
+          maxLength: 20
+          description: E.164 phone number for the user (e.g. +15551234567)
+          example: +15551234567
+        code:
+          type: string
+          pattern: '^\d{6}$'
+          description: 6-digit SMS verification code
+          example: 123456
+
+    ResendVerificationRequest:
+      type: object
+      required:
+        - email
+        - type
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: The user's email address
+          example: user@example.com
+        type:
+          type: string
+          enum: [EMAIL, SMS]
+          description: Type of verification to resend
+          example: EMAIL
 
     UserInfo:
       type: object
@@ -477,6 +607,10 @@ components:
           format: email
           maxLength: 254
           example: user@example.com
+        emailVerified:
+          type: boolean
+          description: Whether the user's email address has been verified
+          example: true
         imageUrl:
           type: string
           description: Optional URL to the user's profile image
@@ -487,6 +621,10 @@ components:
           pattern: '^\+\d{1,20}$'
           maxLength: 20
           description: E.164 phone number for the user (e.g. +15551234567). May be null if not provided.
+        phoneVerified:
+          type: boolean
+          description: Whether the user's phone number has been verified (null if no phone number)
+          example: false
         roles:
           type: array
           description: List of roles assigned to the user

@@ -154,6 +154,8 @@ public class UserService {
                     .userId(user.getUuid())
                     .provider(user.getProvider())
                     .roles(user.getRoles().stream().map(RoleEntity::getName).toList())
+                    .emailVerified(user.getEmailVerified())
+                    .phoneVerified(user.getPhoneVerified())
                     .lastLoginAt((user.getLastLoginAt() != null) ? user.getLastLoginAt().atOffset(ZoneOffset.UTC) : null)
                     .createdAt(user.getCreatedAt().atOffset(ZoneOffset.UTC))
                     .updatedAt(user.getUpdatedAt().atOffset(ZoneOffset.UTC));

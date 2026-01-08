@@ -16,3 +16,10 @@ communicationms.base-url: ${COMMUNICATION-SERVICE-BASE-URL:http://localhost:3001
 users:
   default-roles:
     - USER_MS_USER
+
+app:
+  verification:
+    email:
+      expiration-hours: 24
+    sms:
+      expiration-minutes: 120

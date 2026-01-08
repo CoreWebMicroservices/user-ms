@@ -7,7 +7,6 @@ import com.corems.userms.app.entity.LoginTokenEntity;
 import com.corems.userms.app.entity.RoleEntity;
 import com.corems.userms.app.entity.UserEntity;
 import com.corems.common.exception.ServiceException;
-import com.corems.common.security.CoreMsRoles;
 import com.corems.userms.app.exception.UserServiceExceptionReasonCodes;
 import com.corems.userms.api.model.AccessTokenResponse;
 import com.corems.userms.api.model.SignInRequest;
@@ -28,7 +27,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -41,7 +39,8 @@ public class AuthService {
     private final LoginTokenRepository loginTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenProvider tokenProvider;
-    private final NotificationService notificationService;
+    private final VerificationService verificationService;
+    private final RoleService roleService;
 
     public TokenResponse signIn(SignInRequest signRequest) {
         UserEntity user = userRepository
@@ -124,6 +123,7 @@ public class AuthService {
         );
     }
 
+    @Transactional
     public SuccessfulResponse signUp(SignUpRequest signUpRequest) {
         log.info("Sign up request for email: {}", signUpRequest.getEmail());
         if (!Objects.equals(signUpRequest.getPassword(), signUpRequest.getConfirmPassword())) {
@@ -139,20 +139,58 @@ public class AuthService {
                 .firstName(signUpRequest.getFirstName())
                 .lastName(signUpRequest.getLastName())
                 .provider(AuthProvider.local.name())
-                .password(passwordEncoder.encode(signUpRequest.getPassword()));
+                .password(passwordEncoder.encode(signUpRequest.getPassword()))
+                .emailVerified(false);
 
+        if (signUpRequest.getPhoneNumber() != null) {
+            userBuilder.phoneNumber(signUpRequest.getPhoneNumber())
+                      .phoneVerified(false);
+        }
 
         if (signUpRequest.getImageUrl() != null) {
             userBuilder.imageUrl(signUpRequest.getImageUrl());
         }
 
         UserEntity user = userBuilder.build();
-        user.setRoles(List.of(new RoleEntity(CoreMsRoles.USER_MS_USER, user)));
+        roleService.assignDefaultRoles(user);
 
         var savedUser = userRepository.save(user);
 
-        notificationService.sendWelcomeEmail(savedUser);
+        verificationService.sendEmailVerification(savedUser);
+        
+        if (savedUser.getPhoneNumber() != null) {
+            verificationService.sendSmsVerification(savedUser);
+        }
 
         return new SuccessfulResponse().result(true);
+    }
+
+    public SuccessfulResponse verifyEmail(String email, String token) {
+        boolean verified = verificationService.verifyEmail(email, token);
+        if (!verified) {
+            throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_TOKEN, "Invalid or expired verification token");
+        }
+        return new SuccessfulResponse().result(true);
+    }
+
+    public SuccessfulResponse verifyPhone(String phoneNumber, String code) {
+        boolean verified = verificationService.verifyPhone(phoneNumber, code);
+        if (!verified) {
+            throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_TOKEN, "Invalid or expired verification code");
+        }
+        return new SuccessfulResponse().result(true);
+    }
+
+    public SuccessfulResponse resendVerification(String email, String type) {
+        try {
+            var verificationType = "EMAIL".equals(type) ? 
+                com.corems.userms.app.entity.VerificationTokenEntity.VerificationType.EMAIL :
+                com.corems.userms.app.entity.VerificationTokenEntity.VerificationType.SMS;
+            
+            verificationService.resendVerification(email, verificationType);
+            return new SuccessfulResponse().result(true);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_REQUEST, e.getMessage());
+        }
     }
 }

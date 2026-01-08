@@ -84,6 +84,13 @@ public class UserEntity {
     @Column(length = 50)
     private String phoneNumber;
 
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private Boolean emailVerified = false;
+
+    @Column(name = "phone_verified")
+    private Boolean phoneVerified;
+
     @JsonIgnore
     private String password;
 

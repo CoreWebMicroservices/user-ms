@@ -13,6 +13,8 @@ import java.util.UUID;
 public interface UserRepository extends SearchableRepository<UserEntity, String> {
     Optional<UserEntity> findByEmail(String username);
 
+    Optional<UserEntity> findByPhoneNumber(String phoneNumber);
+
     Optional<UserEntity> findByUuid(UUID id);
 
     @Override

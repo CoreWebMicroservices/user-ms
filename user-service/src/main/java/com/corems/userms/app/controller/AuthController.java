@@ -2,10 +2,13 @@ package com.corems.userms.app.controller;
 
 import com.corems.userms.api.AuthenticationApi;
 import com.corems.userms.api.model.AccessTokenResponse;
+import com.corems.userms.api.model.ResendVerificationRequest;
 import com.corems.userms.api.model.SignInRequest;
 import com.corems.userms.api.model.SignUpRequest;
 import com.corems.userms.api.model.SuccessfulResponse;
 import com.corems.userms.api.model.TokenResponse;
+import com.corems.userms.api.model.VerifyEmailRequest;
+import com.corems.userms.api.model.VerifyPhoneRequest;
 import com.corems.userms.app.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,4 +43,18 @@ public class AuthController implements AuthenticationApi {
         return ResponseEntity.ok(authService.getAccessToken());
     }
 
+    @Override
+    public ResponseEntity<SuccessfulResponse> verifyEmail(VerifyEmailRequest verifyEmailRequest) {
+        return ResponseEntity.ok(authService.verifyEmail(verifyEmailRequest.getEmail(), verifyEmailRequest.getToken()));
+    }
+
+    @Override
+    public ResponseEntity<SuccessfulResponse> verifyPhone(VerifyPhoneRequest verifyPhoneRequest) {
+        return ResponseEntity.ok(authService.verifyPhone(verifyPhoneRequest.getPhoneNumber(), verifyPhoneRequest.getCode()));
+    }
+
+    @Override
+    public ResponseEntity<SuccessfulResponse> resendVerification(ResendVerificationRequest resendVerificationRequest) {
+        return ResponseEntity.ok(authService.resendVerification(resendVerificationRequest.getEmail(), resendVerificationRequest.getType().getValue()));
+    }
 }

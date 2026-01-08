@@ -15,7 +15,9 @@ public enum AuthExceptionReasonCodes implements ExceptionReasonCodes {
     USER_EXISTS("user.not_found", HttpStatus.BAD_REQUEST, "User already exists"),
     USER_PROVIDER_MISMATCH("user.provider_mismatch", HttpStatus.BAD_REQUEST, "User provider mismatch"),
     USER_PASSWORD_MISMATCH("user.password_mismatch", HttpStatus.BAD_REQUEST, "User password mismatch"),
-    PROVIDER_IS_NOT_SUPPORTED("provider.is_not_supported", HttpStatus.BAD_REQUEST, "Provider is not supported");
+    PROVIDER_IS_NOT_SUPPORTED("provider.is_not_supported", HttpStatus.BAD_REQUEST, "Provider is not supported"),
+    INVALID_TOKEN("verification.invalid_token", HttpStatus.BAD_REQUEST, "Invalid or expired verification token"),
+    INVALID_REQUEST("verification.invalid_request", HttpStatus.BAD_REQUEST, "Invalid verification request");
 
     private final String errorCode;
 

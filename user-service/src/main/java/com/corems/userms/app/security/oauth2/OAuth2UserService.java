@@ -1,8 +1,6 @@
 package com.corems.userms.app.security.oauth2;
 
-import com.corems.common.security.CoreMsRoles;
 import com.corems.common.security.UserPrincipal;
-import com.corems.userms.app.entity.RoleEntity;
 import com.corems.userms.app.entity.UserEntity;
 import com.corems.userms.app.model.exception.AuthExceptionReasonCodes;
 import com.corems.userms.app.model.exception.AuthServiceException;
@@ -10,10 +8,11 @@ import com.corems.userms.app.model.enums.AuthProvider;
 import com.corems.userms.app.repository.UserRepository;
 import com.corems.userms.app.security.oauth2.provider.OAuth2UserInfo;
 import com.corems.userms.app.security.oauth2.provider.OAuth2UserInfoFactory;
+import com.corems.userms.app.service.NotificationService;
+import com.corems.userms.app.service.RoleService;
 import io.micrometer.common.util.StringUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import com.corems.userms.app.service.RoleService;
 import org.springframework.security.authentication.InternalAuthenticationServiceException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -24,7 +23,6 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -34,6 +32,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
     private final RoleService roleService;
+    private final NotificationService notificationService;
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
@@ -76,20 +75,22 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 
             log.info("User found id: {}", user.getId());
         } else {
-            UserEntity newUser = new UserEntity();
-            newUser.setEmail(oAuth2UserInfo.getEmail());
-            newUser.setFirstName(oAuth2UserInfo.getFirstName());
-            newUser.setLastName(oAuth2UserInfo.getLastName());
-            newUser.setProvider(authProvider.name());
-            newUser.setImageUrl(oAuth2UserInfo.getImageUrl());
-            // Assign default roles using centralized RoleService (validates against CoreMsRoles)
-            newUser.setRoles(List.of(new RoleEntity(CoreMsRoles.USER_MS_USER, newUser)));
+            UserEntity newUser = UserEntity.builder()
+                    .email(oAuth2UserInfo.getEmail())
+                    .firstName(oAuth2UserInfo.getFirstName())
+                    .lastName(oAuth2UserInfo.getLastName())
+                    .provider(authProvider.name())
+                    .imageUrl(oAuth2UserInfo.getImageUrl())
+                    .emailVerified(true)  // OAuth2 providers verify emails
+                    .build();
 
+            roleService.assignDefaultRoles(newUser);
 
             user = userRepository.save(newUser);
 
-            log.info("User not exists, created new: {}", user.getId());
+            notificationService.sendWelcomeEmail(user);
 
+            log.info("User not exists, created new: {}", user.getId());
         }
 
         return new UserPrincipal(

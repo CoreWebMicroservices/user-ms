@@ -53,4 +53,41 @@ public class NotificationService {
             log.error("Failed to send welcome SMS to user: {}", user.getPhoneNumber(), e);
         }
     }
+
+    @Async
+    public void sendEmailVerificationCode(String email, String firstName, String token) {
+        try {
+            EmailNotificationRequest request = new EmailNotificationRequest();
+            request.setSubject("Verify Your Email Address");
+            request.setRecipient(email);
+            request.setBody("Dear " + firstName + ",\n\n" +
+                    "Please verify your email address by using the following verification code:\n\n" +
+                    "Verification Code: " + token + "\n\n" +
+                    "This code will expire in 24 hours.\n\n" +
+                    "If you didn't create an account with us, please ignore this email.\n\n" +
+                    "Best regards,\n" +
+                    "The CoreMS Team");
+
+            var res = notificationsApi.sendEmailNotification(request);
+
+            log.info("Email verification sent to: {}, result: {}", email, res);
+        } catch (Exception e) {
+            log.error("Failed to send email verification to: {}", email, e);
+        }
+    }
+
+    @Async
+    public void sendSmsVerificationCode(String phoneNumber, String firstName, String code) {
+        try {
+            SmsNotificationRequest request = new SmsNotificationRequest();
+            request.setPhoneNumber(phoneNumber);
+            request.setMessage("Hi " + firstName + "! Your CoreMS verification code is: " + code + ". Valid for 10 minutes.");
+
+            var res = notificationsApi.sendSmsNotification(request);
+
+            log.info("SMS verification sent to: {}, result: {}", phoneNumber, res);
+        } catch (Exception e) {
+            log.error("Failed to send SMS verification to: {}", phoneNumber, e);
+        }
+    }
 }
