@@ -90,4 +90,26 @@ public class NotificationService {
             log.error("Failed to send SMS verification to: {}", phoneNumber, e);
         }
     }
+
+    @Async
+    public void sendPasswordResetEmail(UserEntity user, String resetToken) {
+        try {
+            EmailNotificationRequest request = new EmailNotificationRequest();
+            request.setSubject("Password Reset Request");
+            request.setRecipient(user.getEmail());
+            request.setBody("Dear " + user.getFirstName() + ",\n\n" +
+                    "You have requested to reset your password. Please use the following token to reset your password:\n\n" +
+                    "Reset Token: " + resetToken + "\n\n" +
+                    "This token will expire in 24 hours.\n\n" +
+                    "If you didn't request a password reset, please ignore this email and your password will remain unchanged.\n\n" +
+                    "Best regards,\n" +
+                    "The CoreMS Team");
+
+            var res = notificationsApi.sendEmailNotification(request);
+
+            log.info("Password reset email sent to user: {}, result: {}", user.getUuid(), res);
+        } catch (Exception e) {
+            log.error("Failed to send password reset email to: {}", user.getEmail(), e);
+        }
+    }
 }

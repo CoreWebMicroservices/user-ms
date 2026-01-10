@@ -78,30 +78,4 @@ CREATE INDEX IF NOT EXISTS idx_login_token_user ON login_token(user_id);
 CREATE INDEX IF NOT EXISTS idx_login_token_uuid ON login_token(uuid);
 CREATE INDEX IF NOT EXISTS idx_login_token_created_at ON login_token(created_at);
 
--- ----------------------------------------------------------------------------
--- verification_token table
--- ----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS verification_token (
-    id              BIGSERIAL PRIMARY KEY,
-    uuid            UUID NOT NULL UNIQUE,
-    user_id         INTEGER NOT NULL,
-    token           VARCHAR(255) NOT NULL,
-    type            VARCHAR(10) NOT NULL CHECK (type IN ('EMAIL', 'SMS')),
-    expires_at      TIMESTAMP NOT NULL,
-    is_used         BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    CONSTRAINT fk_verification_token_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE
-);
-
--- Create sequence for verification_token
-CREATE SEQUENCE IF NOT EXISTS verification_token_seq INCREMENT BY 1 OWNED BY verification_token.id;
-ALTER TABLE verification_token ALTER COLUMN id SET DEFAULT nextval('verification_token_seq');
-
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_verification_token_token_type ON verification_token(token, type);
-CREATE INDEX IF NOT EXISTS idx_verification_token_user_type ON verification_token(user_id, type);
-CREATE INDEX IF NOT EXISTS idx_verification_token_expires_at ON verification_token(expires_at);
-CREATE INDEX IF NOT EXISTS idx_verification_token_uuid ON verification_token(uuid);
-
 RESET search_path;

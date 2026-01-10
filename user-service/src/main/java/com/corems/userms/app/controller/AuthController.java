@@ -2,7 +2,9 @@ package com.corems.userms.app.controller;
 
 import com.corems.userms.api.AuthenticationApi;
 import com.corems.userms.api.model.AccessTokenResponse;
+import com.corems.userms.api.model.ForgotPasswordRequest;
 import com.corems.userms.api.model.ResendVerificationRequest;
+import com.corems.userms.api.model.ResetPasswordRequest;
 import com.corems.userms.api.model.SignInRequest;
 import com.corems.userms.api.model.SignUpRequest;
 import com.corems.userms.api.model.SuccessfulResponse;
@@ -56,5 +58,20 @@ public class AuthController implements AuthenticationApi {
     @Override
     public ResponseEntity<SuccessfulResponse> resendVerification(ResendVerificationRequest resendVerificationRequest) {
         return ResponseEntity.ok(authService.resendVerification(resendVerificationRequest.getEmail(), resendVerificationRequest.getType().getValue()));
+    }
+
+    @Override
+    public ResponseEntity<SuccessfulResponse> forgotPassword(ForgotPasswordRequest forgotPasswordRequest) {
+        return ResponseEntity.ok(authService.forgotPassword(forgotPasswordRequest.getEmail()));
+    }
+
+    @Override
+    public ResponseEntity<SuccessfulResponse> resetPassword(ResetPasswordRequest resetPasswordRequest) {
+        return ResponseEntity.ok(authService.resetPassword(
+                resetPasswordRequest.getEmail(),
+                resetPasswordRequest.getToken(),
+                resetPasswordRequest.getNewPassword(),
+                resetPasswordRequest.getConfirmPassword()
+        ));
     }
 }

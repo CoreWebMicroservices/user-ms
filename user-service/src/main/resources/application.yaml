@@ -23,3 +23,5 @@ app:
       expiration-hours: 24
     sms:
       expiration-minutes: 120
+  password-reset:
+    expiration-hours: 24

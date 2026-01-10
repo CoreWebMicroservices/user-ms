@@ -6,6 +6,7 @@ import com.corems.common.security.service.TokenProvider;
 import com.corems.userms.app.entity.LoginTokenEntity;
 import com.corems.userms.app.entity.RoleEntity;
 import com.corems.userms.app.entity.UserEntity;
+import com.corems.userms.app.model.enums.UserActionType;
 import com.corems.common.exception.ServiceException;
 import com.corems.userms.app.exception.UserServiceExceptionReasonCodes;
 import com.corems.userms.api.model.AccessTokenResponse;
@@ -39,7 +40,7 @@ public class AuthService {
     private final LoginTokenRepository loginTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenProvider tokenProvider;
-    private final VerificationService verificationService;
+    private final UserActionTokenService userActionTokenService;
     private final RoleService roleService;
 
     public TokenResponse signIn(SignInRequest signRequest) {
@@ -156,17 +157,17 @@ public class AuthService {
 
         var savedUser = userRepository.save(user);
 
-        verificationService.sendEmailVerification(savedUser);
+        userActionTokenService.sendEmailVerification(savedUser);
         
         if (savedUser.getPhoneNumber() != null) {
-            verificationService.sendSmsVerification(savedUser);
+            userActionTokenService.sendSmsVerification(savedUser);
         }
 
         return new SuccessfulResponse().result(true);
     }
 
     public SuccessfulResponse verifyEmail(String email, String token) {
-        boolean verified = verificationService.verifyEmail(email, token);
+        boolean verified = userActionTokenService.verifyEmail(email, token);
         if (!verified) {
             throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_TOKEN, "Invalid or expired verification token");
         }
@@ -174,7 +175,7 @@ public class AuthService {
     }
 
     public SuccessfulResponse verifyPhone(String phoneNumber, String code) {
-        boolean verified = verificationService.verifyPhone(phoneNumber, code);
+        boolean verified = userActionTokenService.verifyPhone(phoneNumber, code);
         if (!verified) {
             throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_TOKEN, "Invalid or expired verification code");
         }
@@ -183,14 +184,32 @@ public class AuthService {
 
     public SuccessfulResponse resendVerification(String email, String type) {
         try {
-            var verificationType = "EMAIL".equals(type) ? 
-                com.corems.userms.app.entity.VerificationTokenEntity.VerificationType.EMAIL :
-                com.corems.userms.app.entity.VerificationTokenEntity.VerificationType.SMS;
+            var actionType = "EMAIL".equals(type) ? 
+                UserActionType.EMAIL_VERIFICATION :
+                UserActionType.SMS_VERIFICATION;
             
-            verificationService.resendVerification(email, verificationType);
+            userActionTokenService.resendVerification(email, actionType);
             return new SuccessfulResponse().result(true);
         } catch (IllegalArgumentException | IllegalStateException e) {
             throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_REQUEST, e.getMessage());
         }
+    }
+
+    public SuccessfulResponse forgotPassword(String email) {
+        userActionTokenService.sendPasswordResetEmail(email);
+        return new SuccessfulResponse().result(true);
+    }
+
+    public SuccessfulResponse resetPassword(String email, String token, String newPassword, String confirmPassword) {
+        if (!Objects.equals(newPassword, confirmPassword)) {
+            throw new AuthServiceException(AuthExceptionReasonCodes.USER_PASSWORD_MISMATCH, "Password confirmation does not match");
+        }
+
+        boolean success = userActionTokenService.resetPassword(email, token, newPassword);
+        if (!success) {
+            throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_TOKEN, "Invalid or expired password reset token");
+        }
+
+        return new SuccessfulResponse().result(true);
     }
 }

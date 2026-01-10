@@ -179,6 +179,52 @@ paths:
                 $ref: '#/components/schemas/SuccessfulResponse'
         <<: *common-error-responses
 
+  /api/auth/forgot-password:
+    post:
+      tags:
+        - Authentication
+      summary: Request password reset link
+      operationId: forgotPassword
+      security: []  # No auth required for forgot password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+
+      responses:
+        '200':
+          description: Password reset link sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
+  /api/auth/reset-password:
+    post:
+      tags:
+        - Authentication
+      summary: Reset password with token
+      operationId: resetPassword
+      security: []  # No auth required for reset password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+
+      responses:
+        '200':
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessfulResponse'
+        <<: *common-error-responses
+
   /api/profile:
     get:
       tags:
@@ -739,11 +785,47 @@ components:
 
     ResetPasswordRequest:
       type: object
+      required:
+        - email
+        - token
+        - newPassword
+        - confirmPassword
       properties:
-        emailTemplate:
+        email:
           type: string
-          description: Optional template id used when sending reset link
-          example: default-reset-template
+          format: email
+          maxLength: 254
+          description: The user's email address
+          example: user@example.com
+        token:
+          type: string
+          description: Password reset token received via email
+          example: abc123def456ghi789
+        newPassword:
+          type: string
+          description: New password
+          minLength: 8
+          maxLength: 128
+          format: password
+          example: NewStrongPass1!
+        confirmPassword:
+          type: string
+          description: Confirmation of the new password, should match newPassword
+          minLength: 8
+          maxLength: 128
+          example: NewStrongPass1!
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: The user's email address
+          example: user@example.com
 
     SuccessfulResponse:
       $ref: '.gen/common-api.yaml#/components/schemas/SuccessfulResponse'
