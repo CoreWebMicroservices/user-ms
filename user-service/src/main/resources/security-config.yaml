@@ -6,8 +6,8 @@ spring:
       allowedOrigins: http://localhost:8080
     jwt:
       secretKey: ${AUTH_TOKEN_SECRET} # secret key for signing JWT, define it in your environment variables
-      refreshExpirationTimeInMS: 86400000 # a day
-      accessExpirationTimeInMS: 600000 # 10 minutes
+      refreshExpirationTimeInMinutes: 1440 # a day
+      accessExpirationTimeInMinutes: 10 # 10 minutes
     oauth2:
       client:
         registration:

@@ -35,9 +35,8 @@ public class RoleEntity {
     }
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    @SequenceGenerator(name = "app_user_role_seq", sequenceName = "app_user_role_seq", allocationSize = 1)
-    private Integer id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
     @ManyToOne
     @JoinColumn(name = "user_id")

@@ -25,10 +25,9 @@ import java.util.UUID;
 @Table(name = "login_token")
 public class LoginTokenEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    @SequenceGenerator(name = "login_token_seq", sequenceName = "login_token_seq", allocationSize = 1)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(unique = true)
-    private Integer id;
+    private Long id;
 
     public LoginTokenEntity() {
         this.createdAt = Instant.now();

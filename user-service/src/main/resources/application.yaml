@@ -18,10 +18,9 @@ users:
     - USER_MS_USER
 
 app:
-  verification:
-    email:
-      expiration-hours: 24
-    sms:
-      expiration-minutes: 120
+  frontend:
+    base-url: ${FRONTEND_BASE_URL:http://localhost:8080}
+  verification-email:
+    expiration-minutes: 1440
   password-reset:
-    expiration-hours: 24
+    expiration-minutes: 1440

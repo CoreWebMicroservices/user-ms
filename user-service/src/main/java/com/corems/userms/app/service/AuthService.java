@@ -207,7 +207,7 @@ public class AuthService {
 
         boolean success = userActionTokenService.resetPassword(email, token, newPassword);
         if (!success) {
-            throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_TOKEN, "Invalid or expired password reset token");
+            throw new AuthServiceException(AuthExceptionReasonCodes.INVALID_TOKEN);
         }
 
         return new SuccessfulResponse().result(true);

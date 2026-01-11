@@ -49,6 +49,11 @@ public class SecurityConfig {
             "/actuator/health",
             "/api/auth/signin",
             "/api/auth/signup",
+            "/api/auth/verify-email",
+            "/api/auth/verify-phone",
+            "/api/auth/resend-verification",
+            "/api/auth/forgot-password",
+            "/api/auth/reset-password",
             "/oauth2/**",
             "/unauthorized"
     };

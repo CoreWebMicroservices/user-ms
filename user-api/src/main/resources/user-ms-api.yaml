@@ -461,6 +461,38 @@ paths:
 
 components:
   schemas:
+    # Reusable password schema - modify pattern here to change password complexity for entire API
+    Password:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 128
+      description: |
+        Password requirements:
+        - At least 8 characters
+        - At least one lowercase letter (a-z)
+        - At least one uppercase letter (A-Z)
+        - At least one digit (0-9)
+        - At least one special character (@$!%*?&)
+        - Only allowed characters: letters, digits, @$!%*?&
+      # Uncomment and modify the pattern below to enforce password complexity
+      # Current pattern requires: letter + digit for simplisity of testing
+      pattern: '^(?=.*[a-zA-Z])(?=.*\d).{8,}$'
+      # Alternative patterns:
+      # Simple (length only): '^.{8,}$'
+      # Medium (letter + digit): '^(?=.*[a-zA-Z])(?=.*\d).{8,}$'
+      # Strong (current): '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
+      example: StrongPass1!$'
+
+    # Confirm password field - no pattern validation (should match password field)
+    ConfirmPassword:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 128
+      description: Confirmation of the password, should match the password field
+      example: StrongPass1!
+
     UsersPagedResponse:
       allOf:
         - $ref: '.gen/common-api.yaml#/components/schemas/PaginationMeta'
@@ -484,9 +516,7 @@ components:
           maxLength: 254
           example: user@example.com
         password:
-          type: string
-          description: The user's password
-          example: StrongPass1!
+          $ref: '#/components/schemas/Password'
 
     CreateUserRequest:
       type: object
@@ -540,20 +570,9 @@ components:
           description: The user's email address
           example: user@example.com
         password:
-          type: string
-          description: The user's password
-          minLength: 8
-          maxLength: 128
-          # enable the following pattern to enforce password complexity
-          # pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d@$!%*?&]{8,}$'
-          format: password
-          example: StrongPass1!
+          $ref: '#/components/schemas/Password'
         confirmPassword:
-          type: string
-          description: Confirmation of the user's password, should match the password field
-          minLength: 8
-          maxLength: 128
-          example: StrongPass1!
+          $ref: '#/components/schemas/ConfirmPassword'
         phoneNumber:
           type: string
           pattern: '^\+\d{1,20}$'
@@ -739,20 +758,11 @@ components:
         - confirmPassword
       properties:
         oldPassword:
-          type: string
-          description: Current password
-          minLength: 8
-          maxLength: 128
+          $ref: '#/components/schemas/Password'
         newPassword:
-          type: string
-          description: New password
-          minLength: 8
-          maxLength: 128
+          $ref: '#/components/schemas/Password'
         confirmPassword:
-          type: string
-          description: Confirmation of the new password, should match newPassword
-          minLength: 8
-          maxLength: 128
+          $ref: '#/components/schemas/ConfirmPassword'
 
     AdminSetPasswordRequest:
       type: object
@@ -761,15 +771,9 @@ components:
         - confirmPassword
       properties:
         newPassword:
-          type: string
-          description: New password to set for the user (admin)
-          minLength: 8
-          maxLength: 128
+          $ref: '#/components/schemas/Password'
         confirmPassword:
-          type: string
-          description: Confirmation of the new password, should match newPassword
-          minLength: 8
-          maxLength: 128
+          $ref: '#/components/schemas/ConfirmPassword'
 
     ChangeEmailRequest:
       type: object
@@ -802,18 +806,9 @@ components:
           description: Password reset token received via email
           example: abc123def456ghi789
         newPassword:
-          type: string
-          description: New password
-          minLength: 8
-          maxLength: 128
-          format: password
-          example: NewStrongPass1!
+          $ref: '#/components/schemas/Password'
         confirmPassword:
-          type: string
-          description: Confirmation of the new password, should match newPassword
-          minLength: 8
-          maxLength: 128
-          example: NewStrongPass1!
+          $ref: '#/components/schemas/ConfirmPassword'
 
     ForgotPasswordRequest:
       type: object

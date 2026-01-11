@@ -1,8 +1,11 @@
 package com.corems.userms.app.service;
 
 import com.corems.common.security.service.TokenProvider;
+import com.corems.userms.app.entity.ActionTokenEntity;
 import com.corems.userms.app.entity.UserEntity;
+import com.corems.userms.app.model.enums.AuthProvider;
 import com.corems.userms.app.model.enums.UserActionType;
+import com.corems.userms.app.repository.ActionTokenRepository;
 import com.corems.userms.app.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +15,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -23,27 +30,28 @@ import java.util.UUID;
 public class UserActionTokenService {
 
     private final UserRepository userRepository;
+    private final ActionTokenRepository actionTokenRepository;
     private final NotificationService notificationService;
     private final PasswordEncoder passwordEncoder;
     private final TokenProvider tokenProvider;
 
-    @Value("${app.verification.email.expiration-hours:24}")
-    private int emailVerificationExpirationHours;
+    @Value("${app.verification-email.expiration-minutes:1440}")
+    private int emailVerificationExpirationMinutes;
 
-    @Value("${app.verification.sms.expiration-minutes:120}")
-    private int smsVerificationExpirationMinutes;
-
-    @Value("${app.password-reset.expiration-hours:24}")
-    private int passwordResetExpirationHours;
+    @Value("${app.password-reset.expiration-minutes:1440}")
+    private int passwordResetExpirationMinutes;
 
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final String ACTION_TYPE_CLAIM = "action_type";
     private static final String USER_ID_CLAIM = "user_id";
     private static final String EMAIL_CLAIM = "email";
+    private static final String TOKEN_ID_CLAIM = "token_id";
 
     @Transactional
     public void sendEmailVerification(UserEntity user) {
-        String token = createActionToken(user, UserActionType.EMAIL_VERIFICATION, emailVerificationExpirationHours * 3600L);
+        actionTokenRepository.deleteByUserUuidAndActionType(user.getUuid(), UserActionType.EMAIL_VERIFICATION);
+        
+        String token = createActionToken(user, UserActionType.EMAIL_VERIFICATION, emailVerificationExpirationMinutes);
         notificationService.sendEmailVerificationCode(user.getEmail(), user.getFirstName(), token);
         log.info("Email verification sent to user: {}", user.getEmail());
     }
@@ -69,12 +77,27 @@ public class UserActionTokenService {
             Claims claims = tokenProvider.getAllClaims(token);
             String actionType = claims.get(ACTION_TYPE_CLAIM, String.class);
             String tokenEmail = claims.get(EMAIL_CLAIM, String.class);
+            String tokenId = claims.get(TOKEN_ID_CLAIM, String.class);
             
             if (!UserActionType.EMAIL_VERIFICATION.name().equals(actionType)) {
                 return false;
             }
             
             if (!email.equals(tokenEmail)) {
+                return false;
+            }
+            
+            String tokenHash = hashToken(token);
+            Optional<ActionTokenEntity> actionTokenOpt = actionTokenRepository.findByTokenHashAndActionTypeAndUsedFalse(tokenHash, UserActionType.EMAIL_VERIFICATION);
+            
+            if (actionTokenOpt.isEmpty()) {
+                log.warn("Action token not found or already used for email verification: {}", email);
+                return false;
+            }
+            
+            ActionTokenEntity actionToken = actionTokenOpt.get();
+            if (actionToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+                log.warn("Action token expired for email verification: {}", email);
                 return false;
             }
             
@@ -86,6 +109,10 @@ public class UserActionTokenService {
             UserEntity user = userOptional.get();
             user.setEmailVerified(true);
             userRepository.save(user);
+            
+            actionToken.setUsed(true);
+            actionToken.setUsedAt(LocalDateTime.now());
+            actionTokenRepository.save(actionToken);
             
             log.info("Email verified for user: {}", email);
             return true;
@@ -149,7 +176,10 @@ public class UserActionTokenService {
         }
 
         UserEntity user = userOptional.get();
-        String token = createActionToken(user, UserActionType.PASSWORD_RESET, passwordResetExpirationHours * 3600L);
+        
+        actionTokenRepository.deleteByUserUuidAndActionType(user.getUuid(), UserActionType.PASSWORD_RESET);
+        
+        String token = createActionToken(user, UserActionType.PASSWORD_RESET, passwordResetExpirationMinutes);
         notificationService.sendPasswordResetEmail(user, token);
         
         log.info("Password reset email sent to user: {}", email);
@@ -177,14 +207,35 @@ public class UserActionTokenService {
                 return false;
             }
             
+            String tokenHash = hashToken(token);
+            Optional<ActionTokenEntity> actionTokenOpt = actionTokenRepository.findByTokenHashAndActionTypeAndUsedFalse(tokenHash, UserActionType.PASSWORD_RESET);
+            
+            if (actionTokenOpt.isEmpty()) {
+                log.warn("Action token not found or already used for password reset: {}", email);
+                return false;
+            }
+            
+            ActionTokenEntity actionToken = actionTokenOpt.get();
+            if (actionToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+                log.warn("Action token expired for password reset: {}", email);
+                return false;
+            }
+            
             Optional<UserEntity> userOptional = userRepository.findByEmail(email);
             if (userOptional.isEmpty()) {
                 return false;
             }
             
             UserEntity user = userOptional.get();
+            if (!user.getProvider().contains(AuthProvider.local.name())) {
+                user.setProvider(user.getProvider() + "," + AuthProvider.local.name());
+            }
             user.setPassword(passwordEncoder.encode(newPassword));
             userRepository.save(user);
+            
+            actionToken.setUsed(true);
+            actionToken.setUsedAt(LocalDateTime.now());
+            actionTokenRepository.save(actionToken);
             
             log.info("Password successfully reset for user: {}", email);
             return true;
@@ -194,17 +245,59 @@ public class UserActionTokenService {
         }
     }
 
-    private String createActionToken(UserEntity user, UserActionType actionType, long expirationSeconds) {
+    private String createActionToken(UserEntity user, UserActionType actionType, long expirationMinutes) {
+        UUID tokenId = UUID.randomUUID();
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(expirationMinutes);
+        
         Map<String, Object> claims = Map.of(
                 ACTION_TYPE_CLAIM, actionType.name(),
                 USER_ID_CLAIM, user.getUuid().toString(),
-                EMAIL_CLAIM, user.getEmail()
+                EMAIL_CLAIM, user.getEmail(),
+                TOKEN_ID_CLAIM, tokenId.toString()
         );
         
-        return tokenProvider.createAccessToken(UUID.randomUUID().toString(), claims);
+        String token = tokenProvider.createCustomToken(actionType.name(), tokenId.toString(), claims, expirationMinutes);
+        String tokenHash = hashToken(token);
+        
+        ActionTokenEntity actionToken = ActionTokenEntity.builder()
+                .uuid(tokenId)
+                .tokenHash(tokenHash)
+                .actionType(actionType)
+                .user(user)
+                .expiresAt(expiresAt)
+                .used(false)
+                .build();
+        
+        actionTokenRepository.save(actionToken);
+        
+        return token;
     }
 
     private String generateNumericCode() {
         return String.format("%06d", SECURE_RANDOM.nextInt(1000000));
+    }
+
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 algorithm not available", e);
+        }
+    }
+
+    @Transactional
+    public void cleanupExpiredTokens() {
+        actionTokenRepository.deleteExpiredTokens(LocalDateTime.now());
+        log.info("Cleaned up expired action tokens");
     }
 }

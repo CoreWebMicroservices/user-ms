@@ -6,6 +6,7 @@ import com.corems.communicationms.client.NotificationsApi;
 import com.corems.userms.app.entity.UserEntity;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,12 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class NotificationService {
     private final NotificationsApi notificationsApi;
+    
+    @Value("${app.frontend.base-url}")
+    private String frontendBaseUrl;
+    
+    private static final String EMAIL_VERIFICATION_PATH = "/verify-email";
+    private static final String PASSWORD_RESET_PATH = "/reset-password";
 
     @Async
     public void sendWelcomeEmail(UserEntity user) {
@@ -57,13 +64,15 @@ public class NotificationService {
     @Async
     public void sendEmailVerificationCode(String email, String firstName, String token) {
         try {
+            String verificationUrl = frontendBaseUrl + EMAIL_VERIFICATION_PATH + "?email=" + email + "&token=" + token;
+            
             EmailNotificationRequest request = new EmailNotificationRequest();
             request.setSubject("Verify Your Email Address");
             request.setRecipient(email);
             request.setBody("Dear " + firstName + ",\n\n" +
-                    "Please verify your email address by using the following verification code:\n\n" +
-                    "Verification Code: " + token + "\n\n" +
-                    "This code will expire in 24 hours.\n\n" +
+                    "Please verify your email address by clicking the link below:\n\n" +
+                    verificationUrl + "\n\n" +
+                    "This link will expire in 24 hours.\n\n" +
                     "If you didn't create an account with us, please ignore this email.\n\n" +
                     "Best regards,\n" +
                     "The CoreMS Team");
@@ -94,13 +103,15 @@ public class NotificationService {
     @Async
     public void sendPasswordResetEmail(UserEntity user, String resetToken) {
         try {
+            String resetUrl = frontendBaseUrl + PASSWORD_RESET_PATH + "?email=" + user.getEmail() + "&token=" + resetToken;
+            
             EmailNotificationRequest request = new EmailNotificationRequest();
             request.setSubject("Password Reset Request");
             request.setRecipient(user.getEmail());
             request.setBody("Dear " + user.getFirstName() + ",\n\n" +
-                    "You have requested to reset your password. Please use the following token to reset your password:\n\n" +
-                    "Reset Token: " + resetToken + "\n\n" +
-                    "This token will expire in 24 hours.\n\n" +
+                    "You have requested to reset your password. Please click the link below to reset your password:\n\n" +
+                    resetUrl + "\n\n" +
+                    "This link will expire in 24 hours.\n\n" +
                     "If you didn't request a password reset, please ignore this email and your password will remain unchanged.\n\n" +
                     "Best regards,\n" +
                     "The CoreMS Team");

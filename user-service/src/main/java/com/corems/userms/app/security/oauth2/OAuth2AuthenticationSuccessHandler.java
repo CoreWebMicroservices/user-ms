@@ -74,7 +74,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         loginTokenRepository.save(loginToken);
 
         return UriComponentsBuilder.fromUriString(targetUrl)
-                .queryParam("token", token)
+                .queryParam("refresh_token", token)
                 .build().toUriString();
     }
 
