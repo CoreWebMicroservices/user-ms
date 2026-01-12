@@ -43,17 +43,35 @@ public class ProfileService {
         UserEntity user = userRepository.findByUuid(userPrincipal.getUserId())
                 .orElseThrow(() -> new AuthServiceException(AuthExceptionReasonCodes.USER_NOT_FOUND,
                         String.format(USER_NOT_FOUND_MSG, userPrincipal.getUserId())));
+        
+        // Validate phone number uniqueness if provided and different from current
+        if (userProfileUpdateRequest.getPhoneNumber() != null 
+            && !userProfileUpdateRequest.getPhoneNumber().equals(user.getPhoneNumber())) {
+            
+            userRepository.findByPhoneNumber(userProfileUpdateRequest.getPhoneNumber())
+                .ifPresent(existingUser -> {
+                    if (!existingUser.getUuid().equals(user.getUuid())) {
+                        throw new AuthServiceException(AuthExceptionReasonCodes.USER_EXISTS, 
+                            "Phone number is already in use by another user");
+                    }
+                });
+        }
+        
         if (userProfileUpdateRequest.getFirstName() != null)
             user.setFirstName(userProfileUpdateRequest.getFirstName());
         if (userProfileUpdateRequest.getLastName() != null)
             user.setLastName(userProfileUpdateRequest.getLastName());
         if (userProfileUpdateRequest.getImageUrl() != null)
             user.setImageUrl(userProfileUpdateRequest.getImageUrl());
-        if (userProfileUpdateRequest.getPhoneNumber() != null)
+        if (userProfileUpdateRequest.getPhoneNumber() != null) {
             user.setPhoneNumber(userProfileUpdateRequest.getPhoneNumber());
+            user.setPhoneVerified(false);
+        }
+        
         userRepository.save(user);
         return mapToUserInfo(user);
     }
+        
 
     public SuccessfulResponse changeOwnPassword(ChangePasswordRequest changePasswordRequest) {
         UserPrincipal userPrincipal = SecurityUtils.getUserPrincipal();
@@ -86,6 +104,8 @@ public class ProfileService {
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())
                 .imageUrl(user.getImageUrl())
+                .emailVerified(user.getEmailVerified())
+                .phoneVerified(user.getPhoneVerified())
                 .provider(user.getProvider())
                 .roles(user.getRoles().stream().map(RoleEntity::getName).toList())
                 .lastLoginAt((user.getLastLoginAt() != null) ? user.getLastLoginAt().atOffset(ZoneOffset.UTC) : null)

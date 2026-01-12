@@ -135,6 +135,15 @@ public class AuthService {
             throw new AuthServiceException(AuthExceptionReasonCodes.USER_EXISTS, "User found in the system");
         }
 
+        // Validate phone number uniqueness if provided
+        if (signUpRequest.getPhoneNumber() != null) {
+            userRepository.findByPhoneNumber(signUpRequest.getPhoneNumber())
+                .ifPresent(existingUser -> {
+                    throw new AuthServiceException(AuthExceptionReasonCodes.USER_EXISTS, 
+                        "Phone number is already in use");
+                });
+        }
+
         UserEntity.UserEntityBuilder userBuilder = UserEntity.builder()
                 .email(signUpRequest.getEmail())
                 .firstName(signUpRequest.getFirstName())

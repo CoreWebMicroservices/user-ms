@@ -62,7 +62,28 @@ public class UserActionTokenService {
             throw new IllegalStateException("User does not have a phone number");
         }
         
+        // Delete any existing SMS verification tokens for this user
+        actionTokenRepository.deleteByUserUuidAndActionType(user.getUuid(), UserActionType.SMS_VERIFICATION);
+        
         String code = generateNumericCode();
+        
+        // Store the SMS code as an action token for validation
+        UUID tokenId = UUID.randomUUID();
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10); // SMS codes expire in 10 minutes
+        
+        String codeHash = hashToken(code); // Hash the code for security
+        
+        ActionTokenEntity actionToken = ActionTokenEntity.builder()
+                .uuid(tokenId)
+                .tokenHash(codeHash)
+                .actionType(UserActionType.SMS_VERIFICATION)
+                .user(user)
+                .expiresAt(expiresAt)
+                .used(false)
+                .build();
+        
+        actionTokenRepository.save(actionToken);
+        
         notificationService.sendSmsVerificationCode(user.getPhoneNumber(), user.getFirstName(), code);
         log.info("SMS verification sent to user: {}", user.getPhoneNumber());
     }
@@ -124,17 +145,46 @@ public class UserActionTokenService {
 
     @Transactional
     public boolean verifyPhone(String phoneNumber, String code) {
-        Optional<UserEntity> userOptional = userRepository.findByPhoneNumber(phoneNumber);
-        if (userOptional.isEmpty()) {
+        try {
+            Optional<UserEntity> userOptional = userRepository.findByPhoneNumber(phoneNumber);
+            if (userOptional.isEmpty()) {
+                log.warn("No user found with phone number: {}", phoneNumber);
+                return false;
+            }
+            
+            UserEntity user = userOptional.get();
+            String codeHash = hashToken(code);
+            
+            Optional<ActionTokenEntity> actionTokenOpt = actionTokenRepository
+                .findByTokenHashAndActionTypeAndUsedFalseAndUserUuid(codeHash, UserActionType.SMS_VERIFICATION, user.getUuid());
+            
+            if (actionTokenOpt.isEmpty()) {
+                log.warn("No valid SMS verification token found for phone number: {}", phoneNumber);
+                return false;
+            }
+            
+            ActionTokenEntity actionToken = actionTokenOpt.get();
+            
+            if (actionToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+                log.warn("SMS verification token expired for user: {}", user.getUuid());
+                return false;
+            }
+            
+            // Valid token found - mark phone as verified and token as used
+            user.setPhoneVerified(true);
+            userRepository.save(user);
+            
+            actionToken.setUsed(true);
+            actionToken.setUsedAt(LocalDateTime.now());
+            actionTokenRepository.save(actionToken);
+            
+            log.info("Phone verified for user: {} with phone: {}", user.getUuid(), phoneNumber);
+            return true;
+            
+        } catch (Exception e) {
+            log.warn("Invalid SMS verification code for phone: {}", phoneNumber, e);
             return false;
         }
-        
-        UserEntity user = userOptional.get();
-        user.setPhoneVerified(true);
-        userRepository.save(user);
-        
-        log.info("Phone verified for user: {}", phoneNumber);
-        return true;
     }
 
     @Transactional
@@ -297,7 +347,7 @@ public class UserActionTokenService {
 
     @Transactional
     public void cleanupExpiredTokens() {
-        actionTokenRepository.deleteExpiredTokens(LocalDateTime.now());
+        actionTokenRepository.deleteByExpiresAtBefore(LocalDateTime.now());
         log.info("Cleaned up expired action tokens");
     }
 }

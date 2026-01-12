@@ -50,11 +50,28 @@ public class UserService {
         UserEntity user = userRepository.findByUuid(userId)
                 .orElseThrow(() -> new AuthServiceException(AuthExceptionReasonCodes.USER_NOT_FOUND, String.format(USER_NOT_FOUND_MSG, userId)));
 
+        // Validate phone number uniqueness if provided and different from current
+        if (userInfo.getPhoneNumber() != null 
+            && !userInfo.getPhoneNumber().equals(user.getPhoneNumber())) {
+            
+            userRepository.findByPhoneNumber(userInfo.getPhoneNumber())
+                .ifPresent(existingUser -> {
+                    if (!existingUser.getUuid().equals(user.getUuid())) {
+                        throw ServiceException.of(UserServiceExceptionReasonCodes.USER_EXISTS, 
+                            "Phone number is already in use by another user");
+                    }
+                });
+        }
+
         if (userInfo.getFirstName() != null) user.setFirstName(userInfo.getFirstName());
         if (userInfo.getLastName() != null) user.setLastName(userInfo.getLastName());
         if (userInfo.getEmail() != null) user.setEmail(userInfo.getEmail());
         if (userInfo.getImageUrl() != null) user.setImageUrl(userInfo.getImageUrl());
-        if (userInfo.getPhoneNumber() != null) user.setPhoneNumber(userInfo.getPhoneNumber());
+        if (userInfo.getPhoneNumber() != null) {
+            user.setPhoneNumber(userInfo.getPhoneNumber());
+            // Reset phone verification when phone number changes
+            user.setPhoneVerified(false);
+        }
 
         if (userInfo.getRoles() != null) {
             assignRoles(user, userInfo.getRoles());
@@ -68,6 +85,15 @@ public class UserService {
     public SuccessfulResponse createUser(CreateUserRequest createUserRequest) {
         if (userRepository.findByEmail(createUserRequest.getEmail()).isPresent()) {
             throw ServiceException.of(UserServiceExceptionReasonCodes.USER_EXISTS, "User with this email already exists");
+        }
+
+        // Validate phone number uniqueness if provided
+        if (createUserRequest.getPhoneNumber() != null) {
+            userRepository.findByPhoneNumber(createUserRequest.getPhoneNumber())
+                .ifPresent(existingUser -> {
+                    throw ServiceException.of(UserServiceExceptionReasonCodes.USER_EXISTS, 
+                        "User with this phone number already exists");
+                });
         }
 
         UserEntity.UserEntityBuilder userBuilder = UserEntity.builder()

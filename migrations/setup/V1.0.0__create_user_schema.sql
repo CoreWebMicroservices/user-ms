@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS app_user (
     first_name      VARCHAR(50),
     last_name       VARCHAR(50),
     image_url       VARCHAR(255),
-    phone_number    VARCHAR(50),
+    phone_number    VARCHAR(50) UNIQUE,
     password        VARCHAR(255),
     email_verified  BOOLEAN NOT NULL DEFAULT FALSE,
     phone_verified  BOOLEAN DEFAULT NULL,
