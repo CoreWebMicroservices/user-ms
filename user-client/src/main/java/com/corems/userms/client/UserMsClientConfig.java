@@ -1,6 +1,12 @@
 package com.corems.userms.client;
 
 import com.corems.userms.ApiClient;
+import com.corems.userms.client.AdminApi;
+import com.corems.userms.client.OAuth2Api;
+import com.corems.userms.client.OidcApi;
+import com.corems.userms.client.PasswordApi;
+import com.corems.userms.client.ProfileApi;
+import com.corems.userms.client.RegistrationApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -29,9 +35,9 @@ public class UserMsClientConfig {
     }
 
     @Bean
-    @ConditionalOnMissingBean(name = "userApi")
-    public UserApi userApi(ApiClient userApiClient) throws Exception {
-       return new UserApi(userApiClient);
+    @ConditionalOnMissingBean(name = "adminApi")
+    public AdminApi adminApi(ApiClient userApiClient) throws Exception {
+       return new AdminApi(userApiClient);
     }
 
     @Bean
@@ -41,9 +47,27 @@ public class UserMsClientConfig {
     }
 
     @Bean
-    @ConditionalOnMissingBean(name = "authenticationApi")
-    public AuthenticationApi authenticationApi(ApiClient userApiClient) throws Exception {
-        return new AuthenticationApi(userApiClient);
+    @ConditionalOnMissingBean(name = "registrationApi")
+    public RegistrationApi registrationApi(ApiClient userApiClient) throws Exception {
+        return new RegistrationApi(userApiClient);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "oauth2Api")
+    public OAuth2Api oauth2Api(ApiClient userApiClient) throws Exception {
+        return new OAuth2Api(userApiClient);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "oidcApi")
+    public OidcApi oidcApi(ApiClient userApiClient) throws Exception {
+        return new OidcApi(userApiClient);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(name = "passwordApi")
+    public PasswordApi passwordApi(ApiClient userApiClient) throws Exception {
+        return new PasswordApi(userApiClient);
     }
 
 }

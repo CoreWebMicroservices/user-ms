@@ -1,7 +1,7 @@
 -- ============================================================================
 -- V1.0.0 - Create user_ms schema
 -- ============================================================================
--- Based on: UserEntity, RoleEntity, LoginTokenEntity, ActionTokenEntity
+-- Based on: UserEntity, RoleEntity, LoginTokenEntity, ActionTokenEntity, AuthorizationCodeEntity
 -- ============================================================================
 
 CREATE SCHEMA IF NOT EXISTS user_ms;
@@ -86,5 +86,31 @@ CREATE TABLE IF NOT EXISTS action_tokens (
 -- Essential indexes only
 CREATE INDEX IF NOT EXISTS idx_action_tokens_token_hash ON action_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_action_tokens_user_id ON action_tokens(user_id);
+
+-- ----------------------------------------------------------------------------
+-- authorization_codes table
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS authorization_codes (
+    id              BIGSERIAL PRIMARY KEY,
+    code            VARCHAR(255) NOT NULL UNIQUE,
+    client_id       VARCHAR(255) NOT NULL,
+    redirect_uri    VARCHAR(500) NOT NULL,
+    user_id         BIGINT NOT NULL,
+    scope           VARCHAR(500),
+    code_challenge  VARCHAR(255),
+    code_challenge_method VARCHAR(10),
+    nonce           VARCHAR(255),
+    state           VARCHAR(255),
+    expires_at      TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_used         BOOLEAN NOT NULL DEFAULT FALSE,
+    used_at         TIMESTAMP WITH TIME ZONE,
+    created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT fk_authorization_codes_user FOREIGN KEY (user_id) REFERENCES app_user(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_authorization_codes_code ON authorization_codes(code);
+CREATE INDEX IF NOT EXISTS idx_authorization_codes_user_id ON authorization_codes(user_id);
+CREATE INDEX IF NOT EXISTS idx_authorization_codes_expires_at ON authorization_codes(expires_at);
 
 RESET search_path;

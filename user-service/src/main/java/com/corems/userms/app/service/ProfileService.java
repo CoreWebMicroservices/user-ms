@@ -2,12 +2,11 @@ package com.corems.userms.app.service;
 
 import com.corems.common.security.SecurityUtils;
 import com.corems.common.security.UserPrincipal;
-import com.corems.userms.app.entity.RoleEntity;
-import com.corems.userms.app.entity.UserEntity;
 import com.corems.userms.api.model.ChangePasswordRequest;
+import com.corems.userms.api.model.OidcUserInfo;
+import com.corems.userms.api.model.ProfileUpdateRequest;
 import com.corems.userms.api.model.SuccessfulResponse;
-import com.corems.userms.api.model.UserInfo;
-import com.corems.userms.api.model.UserProfileUpdateRequest;
+import com.corems.userms.app.entity.UserEntity;
 import com.corems.userms.app.model.enums.AuthProvider;
 import com.corems.userms.app.model.exception.AuthExceptionReasonCodes;
 import com.corems.userms.app.model.exception.AuthServiceException;
@@ -17,8 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.ZoneOffset;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -27,89 +24,75 @@ public class ProfileService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final OidcService oidcService;
 
-    public UserInfo getCurrentUserInfo() {
-        UserPrincipal userPrincipal = SecurityUtils.getUserPrincipal();
-
-        UserEntity user = userRepository.findByUuid(userPrincipal.getUserId())
-                .orElseThrow(() -> new AuthServiceException(AuthExceptionReasonCodes.USER_NOT_FOUND,
-                        String.format(USER_NOT_FOUND_MSG, userPrincipal.getUserId())));
-
-        return mapToUserInfo(user);
-    }
-
-    public UserInfo updateCurrentUserProfile(UserProfileUpdateRequest userProfileUpdateRequest) {
+    public OidcUserInfo updateProfile(ProfileUpdateRequest request) {
         UserPrincipal userPrincipal = SecurityUtils.getUserPrincipal();
         UserEntity user = userRepository.findByUuid(userPrincipal.getUserId())
-                .orElseThrow(() -> new AuthServiceException(AuthExceptionReasonCodes.USER_NOT_FOUND,
-                        String.format(USER_NOT_FOUND_MSG, userPrincipal.getUserId())));
+                .orElseThrow(() -> new AuthServiceException(
+                    AuthExceptionReasonCodes.USER_NOT_FOUND,
+                    String.format(USER_NOT_FOUND_MSG, userPrincipal.getUserId())
+                ));
         
-        // Validate phone number uniqueness if provided and different from current
-        if (userProfileUpdateRequest.getPhoneNumber() != null 
-            && !userProfileUpdateRequest.getPhoneNumber().equals(user.getPhoneNumber())) {
+        if (request.getPhoneNumber() != null 
+            && !request.getPhoneNumber().equals(user.getPhoneNumber())) {
             
-            userRepository.findByPhoneNumber(userProfileUpdateRequest.getPhoneNumber())
+            userRepository.findByPhoneNumber(request.getPhoneNumber())
                 .ifPresent(existingUser -> {
                     if (!existingUser.getUuid().equals(user.getUuid())) {
-                        throw new AuthServiceException(AuthExceptionReasonCodes.USER_EXISTS, 
-                            "Phone number is already in use by another user");
+                        throw new AuthServiceException(
+                            AuthExceptionReasonCodes.USER_EXISTS, 
+                            "Phone number already in use"
+                        );
                     }
                 });
         }
         
-        if (userProfileUpdateRequest.getFirstName() != null)
-            user.setFirstName(userProfileUpdateRequest.getFirstName());
-        if (userProfileUpdateRequest.getLastName() != null)
-            user.setLastName(userProfileUpdateRequest.getLastName());
-        if (userProfileUpdateRequest.getImageUrl() != null)
-            user.setImageUrl(userProfileUpdateRequest.getImageUrl());
-        if (userProfileUpdateRequest.getPhoneNumber() != null) {
-            user.setPhoneNumber(userProfileUpdateRequest.getPhoneNumber());
+        if (request.getFirstName() != null)
+            user.setFirstName(request.getFirstName());
+        if (request.getLastName() != null)
+            user.setLastName(request.getLastName());
+        if (request.getImageUrl() != null)
+            user.setImageUrl(request.getImageUrl());
+        if (request.getPhoneNumber() != null) {
+            user.setPhoneNumber(request.getPhoneNumber());
             user.setPhoneVerified(false);
         }
         
         userRepository.save(user);
-        return mapToUserInfo(user);
+        return oidcService.getUserInfo();
     }
-        
 
-    public SuccessfulResponse changeOwnPassword(ChangePasswordRequest changePasswordRequest) {
+    public SuccessfulResponse changePassword(ChangePasswordRequest request) {
         UserPrincipal userPrincipal = SecurityUtils.getUserPrincipal();
         UserEntity user = userRepository.findByUuid(userPrincipal.getUserId())
-                .orElseThrow(() -> new AuthServiceException(AuthExceptionReasonCodes.USER_NOT_FOUND,
-                        String.format(USER_NOT_FOUND_MSG, userPrincipal.getUserId())));
+                .orElseThrow(() -> new AuthServiceException(
+                    AuthExceptionReasonCodes.USER_NOT_FOUND,
+                    String.format(USER_NOT_FOUND_MSG, userPrincipal.getUserId())
+                ));
 
         if (user.getPassword() != null
-                && !passwordEncoder.matches(changePasswordRequest.getOldPassword(), user.getPassword())) {
-            throw new AuthServiceException(AuthExceptionReasonCodes.USER_PASSWORD_MISMATCH, "Wrong password");
+                && !passwordEncoder.matches(request.getOldPassword(), user.getPassword())) {
+            throw new AuthServiceException(
+                AuthExceptionReasonCodes.USER_PASSWORD_MISMATCH, 
+                "Wrong password"
+            );
         }
-        if (!changePasswordRequest.getNewPassword().equals(changePasswordRequest.getConfirmPassword())) {
-            throw new AuthServiceException(AuthExceptionReasonCodes.USER_PASSWORD_MISMATCH,
-                    "New password and confirm password do not match");
+        
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new AuthServiceException(
+                AuthExceptionReasonCodes.USER_PASSWORD_MISMATCH,
+                "Password confirmation does not match"
+            );
         }
 
         if (!user.getProvider().contains(AuthProvider.local.name())) {
             user.setProvider(user.getProvider() + "," + AuthProvider.local.name());
         }
-        user.setPassword(passwordEncoder.encode(changePasswordRequest.getNewPassword()));
+        
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+        
         return new SuccessfulResponse().result(true);
-    }
-
-    private UserInfo mapToUserInfo(UserEntity user) {
-       return new UserInfo()
-                .userId(user.getUuid())
-                .firstName(user.getFirstName())
-                .lastName(user.getLastName())
-                .email(user.getEmail())
-                .phoneNumber(user.getPhoneNumber())
-                .imageUrl(user.getImageUrl())
-                .emailVerified(user.getEmailVerified())
-                .phoneVerified(user.getPhoneVerified())
-                .provider(user.getProvider())
-                .roles(user.getRoles().stream().map(RoleEntity::getName).toList())
-                .lastLoginAt((user.getLastLoginAt() != null) ? user.getLastLoginAt().atOffset(ZoneOffset.UTC) : null)
-                .createdAt(user.getCreatedAt().atOffset(ZoneOffset.UTC))
-                .updatedAt(user.getUpdatedAt().atOffset(ZoneOffset.UTC));
     }
 }

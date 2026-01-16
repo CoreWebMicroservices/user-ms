@@ -1,6 +1,8 @@
 package com.corems.userms.app.controller;
 
-import com.corems.userms.api.UserApi;
+import com.corems.common.security.CoreMsRoles;
+import com.corems.common.security.RequireRoles;
+import com.corems.userms.api.AdminApi;
 import com.corems.userms.api.model.AdminSetPasswordRequest;
 import com.corems.userms.api.model.ChangeEmailRequest;
 import com.corems.userms.api.model.CreateUserRequest;
@@ -9,22 +11,19 @@ import com.corems.userms.api.model.UserInfo;
 import com.corems.userms.api.model.UsersPagedResponse;
 import com.corems.userms.app.service.UserService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
-import com.corems.common.security.RequireRoles;
-import com.corems.common.security.CoreMsRoles;
-
-@Log4j2
+@Slf4j
 @RestController
 @RequiredArgsConstructor
-public class UserController implements UserApi {
+public class UserController implements AdminApi {
 
     private final UserService userService;
 
@@ -63,13 +62,13 @@ public class UserController implements UserApi {
 
     @Override
     @RequireRoles(CoreMsRoles.USER_MS_ADMIN)
-    public ResponseEntity<SuccessfulResponse> adminChangeUserPassword(UUID userId, AdminSetPasswordRequest adminSetPasswordRequest) {
-        return ResponseEntity.ok(userService.adminChangeUserPassword(userId, adminSetPasswordRequest));
+    public ResponseEntity<SuccessfulResponse> adminChangeUserPassword(UUID userId, AdminSetPasswordRequest request) {
+        return ResponseEntity.ok(userService.adminChangeUserPassword(userId, request));
     }
 
     @Override
     @RequireRoles(CoreMsRoles.USER_MS_ADMIN)
-    public ResponseEntity<SuccessfulResponse> adminChangeUserEmail(UUID userId, ChangeEmailRequest changeEmailRequest) {
-        return ResponseEntity.ok(userService.adminChangeUserEmail(userId, changeEmailRequest));
+    public ResponseEntity<SuccessfulResponse> adminChangeUserEmail(UUID userId, ChangeEmailRequest request) {
+        return ResponseEntity.ok(userService.adminChangeUserEmail(userId, request));
     }
 }

@@ -10,5 +10,6 @@ import java.util.UUID;
 @Repository
 public interface LoginTokenRepository extends JpaRepository<LoginTokenEntity, String> {
     Optional<LoginTokenEntity> findByUuid(UUID uuid);
+    Optional<LoginTokenEntity> findByToken(String token);
     void deleteByUuid(UUID uuid);
 }

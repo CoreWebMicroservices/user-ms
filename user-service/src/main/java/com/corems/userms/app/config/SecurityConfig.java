@@ -12,6 +12,7 @@ import com.corems.userms.app.security.oauth2.OAuth2AuthenticationFailureHandler;
 import com.corems.userms.app.security.oauth2.OAuth2AuthenticationSuccessHandler;
 import com.corems.userms.app.security.oauth2.UserAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -38,22 +39,23 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Arrays;
 
 @Configuration
-@Import(WebMvcConfig.class)
-@RequiredArgsConstructor
 @EnableWebSecurity
+@Import({WebMvcConfig.class})
+@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final static String OAUTH2_BASE_URI = "/oauth2/authorize";
     private final static String OAUTH2_REDIRECTION_ENDPOINT = "/oauth2/callback/*";
     private final static String[] WHITE_LIST_URLS = {
             "/actuator/health",
-            "/api/auth/signin",
             "/api/auth/signup",
             "/api/auth/verify-email",
             "/api/auth/verify-phone",
             "/api/auth/resend-verification",
             "/api/auth/forgot-password",
             "/api/auth/reset-password",
+            "/.well-known/openid-configuration",
+            "/.well-known/jwks.json",
             "/oauth2/**",
             "/unauthorized"
     };

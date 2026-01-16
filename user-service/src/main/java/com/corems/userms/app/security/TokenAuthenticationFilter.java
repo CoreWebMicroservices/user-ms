@@ -48,14 +48,14 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
 
         if (StringUtils.hasText(jwt) && tokenProvider.isTokenValid(jwt)) {
             Claims claims = tokenProvider.getAllClaims(jwt);
-            String userIdStr = claims.get(TokenProvider.CLAIM_USER_ID, String.class);
-            String subjectStr = claims.getSubject();
+            String userIdStr = claims.getSubject();
+            String tokenIdStr = claims.get(TokenProvider.CLAIM_TOKEN_ID, String.class);
             
-            if (StringUtils.hasText(userIdStr) && StringUtils.hasText(subjectStr)) {
-                UserDetails userDetails = userDetailsService.loadUserById(
-                        UUID.fromString(userIdStr),
-                        UUID.fromString(subjectStr)
-                );
+            if (StringUtils.hasText(userIdStr)) {
+                UUID userId = UUID.fromString(userIdStr);
+                UUID tokenId = StringUtils.hasText(tokenIdStr) ? UUID.fromString(tokenIdStr) : null;
+                
+                UserDetails userDetails = userDetailsService.loadUserById(userId, tokenId);
 
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails,

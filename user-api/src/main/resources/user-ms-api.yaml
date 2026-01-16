@@ -2,10 +2,20 @@ openapi: 3.0.3
 info:
   title: CoreMs Auth Service API
   description: |
-    The Authentication Service API allows users to verify the identity of a user.
-    In response user gets access JWT token. 
+    OAuth2 Authorization Server and OpenID Connect.
+    Provider with first-party authentication extensions and user management.
     
-    Authentication service provides oauth2 authentication/registration via popular providers +  JWT Authentication with user login password.
+    **Standard OAuth2/OIDC Endpoints:**
+    - Token endpoint: `/oauth2/token` (signin, refresh)
+    - UserInfo endpoint: `/oauth2/userinfo` (profile)
+    - Revocation endpoint: `/oauth2/revoke` (signout)
+    - Discovery: `/.well-known/openid-configuration`
+    - JWKS: `/.well-known/jwks.json`
+    
+    **Custom Extensions:**
+    - User registration and verification
+    - Password reset flows
+    - Admin user management
   version: 1.0.0
 
 
@@ -14,9 +24,18 @@ servers:
     description: Default server
 
 tags:
-  - name: Authentication
-  - name: User
+  - name: OAuth2
+    description: Standard OAuth2 token operations
+  - name: OIDC
+    description: OpenID Connect endpoints
+  - name: Registration
+    description: User registration and verification
+  - name: Password
+    description: Password management
   - name: Profile
+    description: User profile management
+  - name: Admin
+    description: Administrative user management
 
 x-common-error-responses: &common-error-responses
   '400':
@@ -28,72 +47,249 @@ x-common-error-responses: &common-error-responses
   '500':
     $ref: '.gen/common-api.yaml#/components/responses/InternalServerError'
 
-# Require bearer auth for all operations by default
 security:
   - bearerAuth: []
 
 paths:
-  /api/auth/signin:
-    post:
+  # ============================================================================
+  # OAUTH2/OIDC ENDPOINTS
+  # ============================================================================
+  
+  /.well-known/openid-configuration:
+    get:
       tags:
-        - Authentication
-      summary: Sign in with email and password
-      operationId: signIn
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SignInRequest'
-
+        - OIDC
+      summary: OpenID Connect discovery document
+      operationId: getOidcConfiguration
+      security: []
       responses:
         '200':
-          description: Sign In successfully
+          description: OIDC configuration
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenResponse'
-        <<: *common-error-responses
+                $ref: '#/components/schemas/OidcConfiguration'
 
-  /api/auth/signout:
-    post:
+  /.well-known/jwks.json:
+    get:
       tags:
-        - Authentication
-      summary: Sign out
-      operationId: signOut
-
+        - OIDC
+      summary: JSON Web Key Set (public keys for JWT validation)
+      operationId: getJwks
+      security: []
       responses:
         '200':
-          description: Sign Out successfully
+          description: JWKS response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JwksResponse'
+
+  /oauth2/authorize:
+    get:
+      tags:
+        - OAuth2
+      summary: OAuth2 authorization endpoint (authorization code flow)
+      operationId: authorize
+      security: []
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [code]
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+        - name: scope
+          in: query
+          schema:
+            type: string
+            example: openid profile email
+        - name: state
+          in: query
+          required: true
+          schema:
+            type: string
+          description: CSRF protection token
+        - name: code_challenge
+          in: query
+          required: true
+          schema:
+            type: string
+          description: PKCE code challenge (SHA256 of code_verifier, base64url-encoded)
+        - name: code_challenge_method
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [S256]
+        - name: nonce
+          in: query
+          schema:
+            type: string
+          description: Optional nonce for ID token
+      responses:
+        '302':
+          description: Redirect to login or callback with authorization code
+        '400':
+          $ref: '.gen/common-api.yaml#/components/responses/ValidationError'
+
+  /oauth2/token:
+    post:
+      tags:
+        - OAuth2
+      summary: OAuth2 token endpoint
+      description: |
+        Supports multiple grant types:
+        - `password`: First-party apps only (deprecated for third-party)
+        - `authorization_code`: Standard OAuth2 flow with PKCE
+        - `refresh_token`: Refresh access tokens
+      operationId: token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - grant_type
+              properties:
+                grant_type:
+                  type: string
+                  enum: [password, authorization_code, refresh_token]
+                
+                # Password grant (first-party only)
+                username:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+                
+                # Authorization code grant
+                code:
+                  type: string
+                redirect_uri:
+                  type: string
+                code_verifier:
+                  type: string
+                  description: PKCE code verifier
+                
+                # Refresh token grant
+                refresh_token:
+                  type: string
+                
+                # Optional
+                scope:
+                  type: string
+                client_id:
+                  type: string
+            examples:
+              password_grant:
+                summary: Password grant (first-party)
+                value:
+                  grant_type: password
+                  username: user@example.com
+                  password: StrongPass1!
+                  scope: openid profile email
+              authorization_code_grant:
+                summary: Authorization code grant (PKCE)
+                value:
+                  grant_type: authorization_code
+                  code: abc123def456
+                  redirect_uri: http://localhost:8080/callback
+                  code_verifier: dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
+                  client_id: corems-frontend
+              refresh_grant:
+                summary: Refresh token
+                value:
+                  grant_type: refresh_token
+                  refresh_token: eyJ0eXAiOi...
+      responses:
+        '200':
+          description: Token issued successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OAuth2TokenResponse'
+        '400':
+          $ref: '.gen/common-api.yaml#/components/responses/ValidationError'
+        '401':
+          $ref: '.gen/common-api.yaml#/components/responses/UnauthorizedError'
+
+  /oauth2/revoke:
+    post:
+      tags:
+        - OAuth2
+      summary: Revoke token (signout)
+      description: |
+        Standard OAuth2 token revocation endpoint (RFC 7009).
+        Revokes access or refresh tokens.
+      operationId: revokeToken
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  description: Token to revoke (access or refresh)
+                token_type_hint:
+                  type: string
+                  enum: [access_token, refresh_token]
+                  description: Hint about token type (optional)
+      responses:
+        '200':
+          description: Token revoked successfully
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SuccessfulResponse'
-        <<: *common-error-responses
+        '401':
+          $ref: '.gen/common-api.yaml#/components/responses/UnauthorizedError'
 
-  /api/auth/refresh-token:
-    post:
+  /oauth2/userinfo:
+    get:
       tags:
-        - Authentication
-      summary: Refresh Token
-      operationId: refreshToken
-
+        - OIDC
+      summary: Get current user info (profile)
+      description: Standard OIDC UserInfo endpoint
+      operationId: getUserInfo
       responses:
         '200':
-          description: Token refreshed successfully
+          description: User information
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AccessTokenResponse'
+                $ref: '#/components/schemas/OidcUserInfo'
         <<: *common-error-responses
+
+  # ============================================================================
+  # REGISTRATION & VERIFICATION (Custom - No OAuth2 Standard)
+  # ============================================================================
 
   /api/auth/signup:
     post:
       tags:
-        - Authentication
-      summary: Sign up with email and password
+        - Registration
+      summary: Register new user account
       operationId: signUp
-      security: []  # No auth required for signup
+      security: []
       requestBody:
         required: true
         content:
@@ -103,7 +299,7 @@ paths:
 
       responses:
         '201':
-          description: Sign Up successfully
+          description: User registered successfully
           content:
             application/json:
               schema:
@@ -113,10 +309,10 @@ paths:
   /api/auth/verify-email:
     post:
       tags:
-        - Authentication
+        - Registration
       summary: Verify email address with confirmation token
       operationId: verifyEmail
-      security: []  # No auth required for verification
+      security: []
       requestBody:
         required: true
         content:
@@ -136,10 +332,10 @@ paths:
   /api/auth/verify-phone:
     post:
       tags:
-        - Authentication
+        - Registration
       summary: Verify phone number with confirmation code
       operationId: verifyPhone
-      security: []  # No auth required for verification
+      security: []
       requestBody:
         required: true
         content:
@@ -159,10 +355,10 @@ paths:
   /api/auth/resend-verification:
     post:
       tags:
-        - Authentication
+        - Registration
       summary: Resend verification code/link
       operationId: resendVerification
-      security: []  # No auth required for resend
+      security: []
       requestBody:
         required: true
         content:
@@ -179,13 +375,17 @@ paths:
                 $ref: '#/components/schemas/SuccessfulResponse'
         <<: *common-error-responses
 
+  # ============================================================================
+  # PASSWORD MANAGEMENT (Custom)
+  # ============================================================================
+
   /api/auth/forgot-password:
     post:
       tags:
-        - Authentication
+        - Password
       summary: Request password reset link
       operationId: forgotPassword
-      security: []  # No auth required for forgot password
+      security: []
       requestBody:
         required: true
         content:
@@ -205,10 +405,10 @@ paths:
   /api/auth/reset-password:
     post:
       tags:
-        - Authentication
+        - Password
       summary: Reset password with token
       operationId: resetPassword
-      security: []  # No auth required for reset password
+      security: []
       requestBody:
         required: true
         content:
@@ -225,41 +425,30 @@ paths:
                 $ref: '#/components/schemas/SuccessfulResponse'
         <<: *common-error-responses
 
+  # ============================================================================
+  # PROFILE MANAGEMENT
+  # ============================================================================
+
   /api/profile:
-    get:
-      tags:
-        - Profile
-      summary: Returns current logged user profile
-      operationId: currentUserInfo
-
-      responses:
-        '200':
-          description: User profile response
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserInfo'
-        <<: *common-error-responses
-
     patch:
       tags:
         - Profile
-      summary: Update current user's profile (partial)
-      operationId: updateCurrentUserProfile
+      summary: Update current user profile
+      operationId: updateProfile
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UserProfileUpdateRequest'
+              $ref: '#/components/schemas/ProfileUpdateRequest'
 
       responses:
         '200':
-          description: Updated user profile
+          description: Profile updated successfully
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserInfo'
+                $ref: '#/components/schemas/OidcUserInfo'
         <<: *common-error-responses
 
   /api/profile/change-password:
@@ -267,7 +456,7 @@ paths:
       tags:
         - Profile
       summary: Change password for current user
-      operationId: changeOwnPassword
+      operationId: changePassword
       requestBody:
         required: true
         content:
@@ -284,11 +473,15 @@ paths:
                 $ref: '#/components/schemas/SuccessfulResponse'
         <<: *common-error-responses
 
+  # ============================================================================
+  # ADMIN USER MANAGEMENT
+  # ============================================================================
+
   /api/users:
     get:
       tags:
-        - User
-      summary: Returns all users
+        - Admin
+      summary: List all users
       operationId: getAllUsers
       parameters:
         - $ref: '.gen/common-api.yaml#/components/parameters/page'
@@ -308,7 +501,7 @@ paths:
 
     post:
       tags:
-        - User
+        - Admin
       summary: Create new user
       operationId: createUser
       requestBody:
@@ -330,8 +523,8 @@ paths:
   /api/users/{userId}:
     get:
       tags:
-        - User
-      summary: Returns a user by ID
+        - Admin
+      summary: Get user by ID
       operationId: getUserById
       parameters:
         - name: userId
@@ -350,9 +543,10 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserInfo'
         <<: *common-error-responses
+    
     put:
       tags:
-        - User
+        - Admin
       summary: Update a user by ID
       operationId: updateUserById
       parameters:
@@ -382,7 +576,7 @@ paths:
 
     delete:
       tags:
-        - User
+        - Admin
       summary: Delete a user by ID
       operationId: deleteUserById
       parameters:
@@ -406,7 +600,7 @@ paths:
   /api/users/{userId}/change-password:
     post:
       tags:
-        - User
+        - Admin
       summary: Admin set/change password for a user
       operationId: adminChangeUserPassword
       parameters:
@@ -434,7 +628,7 @@ paths:
   /api/users/{userId}/change-email:
     post:
       tags:
-        - User
+        - Admin
       summary: Admin change user's email (immediate)
       operationId: adminChangeUserEmail
       parameters:
@@ -459,9 +653,273 @@ paths:
                 $ref: '#/components/schemas/SuccessfulResponse'
         <<: *common-error-responses
 
+# ============================================================================
+# SCHEMAS
+# ============================================================================
+
 components:
   schemas:
-    # Reusable password schema - modify pattern here to change password complexity for entire API
+    # ========================================================================
+    # OAUTH2/OIDC STANDARD SCHEMAS
+    # ========================================================================
+    
+    OAuth2TokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+        - expires_in
+      properties:
+        access_token:
+          type: string
+          description: JWT access token for API authorization
+          example: eyJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJhbGciOiJSUzI1NiJ9...
+        token_type:
+          type: string
+          enum: [Bearer]
+          default: Bearer
+          description: Token type (always Bearer)
+        expires_in:
+          type: integer
+          description: Access token lifetime in seconds
+          example: 600
+        refresh_token:
+          type: string
+          description: JWT refresh token (for password grant)
+          example: eyJ0eXAiOiJyZWZyZXNoX3Rva2VuIiwiYWxnIjoiUlMyNTYifQ...
+        id_token:
+          type: string
+          description: |
+            OpenID Connect ID Token (JWT) containing user identity claims.
+            Only returned when 'openid' scope is requested.
+            Contains claims: iss, sub, aud, exp, iat, auth_time, nonce (if provided).
+          example: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImNvcmVtcy0yMDI0LTAxIn0.eyJpc3MiOiJodHRwOi8vbG9jYWxob3N0OjMwMDAiLCJzdWIiOiIyYTNlMGI1Yy0yMTkyLTQ2MTItOWUwMi02OTM5ODlkYmI3ZTUiLCJhdWQiOiJjb3JlbXMtZnJvbnRlbmQiLCJleHAiOjE3MDQwNzA4MDAsImlhdCI6MTcwNDA2NzIwMCwiYXV0aF90aW1lIjoxNzA0MDY3MjAwLCJlbWFpbCI6InVzZXJAZXhhbXBsZS5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwiZ2l2ZW5fbmFtZSI6IkpvaG4iLCJmYW1pbHlfbmFtZSI6IkRvZSIsInBpY3R1cmUiOiJodHRwczovL2V4YW1wbGUuY29tL2ltYWdlcy9qb2huZG9lLmpwZyJ9...
+        scope:
+          type: string
+          description: Granted scopes (space-separated)
+          example: openid profile email
+
+    OidcUserInfo:
+      type: object
+      required:
+        - sub
+      properties:
+        sub:
+          type: string
+          format: uuid
+          description: Subject identifier (userId)
+          example: 2a3e0b5c-2192-4612-9e02-693989dbb7e5
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        email_verified:
+          type: boolean
+          example: true
+        phone_number:
+          type: string
+          example: +15551234567
+        phone_number_verified:
+          type: boolean
+          example: false
+        given_name:
+          type: string
+          description: First name
+          example: John
+        family_name:
+          type: string
+          description: Last name
+          example: Doe
+        picture:
+          type: string
+          format: uri
+          example: https://example.com/images/johndoe.jpg
+        updated_at:
+          type: integer
+          description: Unix timestamp of last update
+          example: 1704067200
+        roles:
+          type: array
+          description: User roles (custom claim)
+          items:
+            type: string
+          example: [USER, ADMIN]
+        provider:
+          type: string
+          description: Auth provider (custom claim)
+          example: local
+
+    OidcConfiguration:
+      type: object
+      properties:
+        issuer:
+          type: string
+          example: http://localhost:3000
+        authorization_endpoint:
+          type: string
+          example: http://localhost:3000/oauth2/authorize
+        token_endpoint:
+          type: string
+          example: http://localhost:3000/oauth2/token
+        userinfo_endpoint:
+          type: string
+          example: http://localhost:3000/oauth2/userinfo
+        jwks_uri:
+          type: string
+          example: http://localhost:3000/.well-known/jwks.json
+        registration_endpoint:
+          type: string
+          example: http://localhost:3000/api/auth/signup
+        revocation_endpoint:
+          type: string
+          example: http://localhost:3000/oauth2/revoke
+        scopes_supported:
+          type: array
+          items:
+            type: string
+          example: [openid, profile, email, phone]
+        response_types_supported:
+          type: array
+          items:
+            type: string
+          example: [code, token]
+        grant_types_supported:
+          type: array
+          items:
+            type: string
+          example: [password, authorization_code, refresh_token]
+        subject_types_supported:
+          type: array
+          items:
+            type: string
+          example: [public]
+        id_token_signing_alg_values_supported:
+          type: array
+          items:
+            type: string
+          example: [RS256]
+        token_endpoint_auth_methods_supported:
+          type: array
+          items:
+            type: string
+          example: [client_secret_post, client_secret_basic, none]
+        code_challenge_methods_supported:
+          type: array
+          items:
+            type: string
+          example: [S256]
+          description: PKCE code challenge methods
+
+    JwksResponse:
+      type: object
+      required:
+        - keys
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              kty:
+                type: string
+                description: Key type
+                example: RSA
+              use:
+                type: string
+                description: Key use
+                example: sig
+              kid:
+                type: string
+                description: Key ID
+                example: corems-2024-01
+              alg:
+                type: string
+                description: Algorithm
+                example: RS256
+              n:
+                type: string
+                description: RSA modulus (base64url)
+              e:
+                type: string
+                description: RSA exponent (base64url)
+                example: AQAB
+
+    IdTokenClaims:
+      type: object
+      description: |
+        OpenID Connect ID Token claims (JWT payload).
+        This is for documentation only - the actual id_token is a signed JWT string.
+      required:
+        - iss
+        - sub
+        - aud
+        - exp
+        - iat
+      properties:
+        iss:
+          type: string
+          description: Issuer identifier (user-ms URL)
+          example: http://localhost:3000
+        sub:
+          type: string
+          format: uuid
+          description: Subject identifier (userId)
+          example: 2a3e0b5c-2192-4612-9e02-693989dbb7e5
+        aud:
+          type: string
+          description: Audience (client_id or service identifier)
+          example: corems-frontend
+        exp:
+          type: integer
+          description: Expiration time (Unix timestamp)
+          example: 1704070800
+        iat:
+          type: integer
+          description: Issued at time (Unix timestamp)
+          example: 1704067200
+        auth_time:
+          type: integer
+          description: Time when authentication occurred (Unix timestamp)
+          example: 1704067200
+        nonce:
+          type: string
+          description: Nonce value from authorization request (if provided)
+          example: abc123xyz789
+        email:
+          type: string
+          format: email
+          description: User's email (if 'email' scope granted)
+          example: user@example.com
+        email_verified:
+          type: boolean
+          description: Email verification status (if 'email' scope granted)
+          example: true
+        given_name:
+          type: string
+          description: First name (if 'profile' scope granted)
+          example: John
+        family_name:
+          type: string
+          description: Last name (if 'profile' scope granted)
+          example: Doe
+        picture:
+          type: string
+          format: uri
+          description: Profile picture URL (if 'profile' scope granted)
+          example: https://example.com/images/johndoe.jpg
+        phone_number:
+          type: string
+          description: Phone number (if 'phone' scope granted)
+          example: +15551234567
+        phone_number_verified:
+          type: boolean
+          description: Phone verification status (if 'phone' scope granted)
+          example: false
+
+    # ========================================================================
+    # APPLICATION-SPECIFIC SCHEMAS
+    # ========================================================================
+    
     Password:
       type: string
       format: password
@@ -470,21 +928,11 @@ components:
       description: |
         Password requirements:
         - At least 8 characters
-        - At least one lowercase letter (a-z)
-        - At least one uppercase letter (A-Z)
-        - At least one digit (0-9)
-        - At least one special character (@$!%*?&)
-        - Only allowed characters: letters, digits, @$!%*?&
-      # Uncomment and modify the pattern below to enforce password complexity
-      # Current pattern requires: letter + digit for simplisity of testing
+        - At least one letter
+        - At least one digit
       pattern: '^(?=.*[a-zA-Z])(?=.*\d).{8,}$'
-      # Alternative patterns:
-      # Simple (length only): '^.{8,}$'
-      # Medium (letter + digit): '^(?=.*[a-zA-Z])(?=.*\d).{8,}$'
-      # Strong (current): '^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$'
-      example: StrongPass1!$'
+      example: StrongPass1!
 
-    # Confirm password field - no pattern validation (should match password field)
     ConfirmPassword:
       type: string
       format: password
@@ -493,65 +941,14 @@ components:
       description: Confirmation of the password, should match the password field
       example: StrongPass1!
 
-    UsersPagedResponse:
-      allOf:
-        - $ref: '.gen/common-api.yaml#/components/schemas/PaginationMeta'
-        - type: object
-          properties:
-            items:
-              type: array
-              items:
-                $ref: '#/components/schemas/UserInfo'
-
-    SignInRequest:
+    SignUpRequest:
       type: object
       required:
         - email
         - password
-      properties:
-        email:
-          type: string
-          format: email
-          description: The user's email address
-          maxLength: 254
-          example: user@example.com
-        password:
-          $ref: '#/components/schemas/Password'
-
-    CreateUserRequest:
-      type: object
-      properties:
-        firstName:
-          type: string
-          description: The user's first name
-          maxLength: 100
-          example: John
-        lastName:
-          type: string
-          description: The user's last name
-          maxLength: 100
-          example: Doe
-        phoneNumber:
-          type: string
-          pattern: '^\+\d{1,20}$'
-          maxLength: 20
-          description: E.164 phone number for the user (e.g. +15551234567)
-          example: +15551234567
-        email:
-          type: string
-          format: email
-          maxLength: 254
-          description: The user's email address
-          example: user@example.com
-        roles:
-          type: array
-          description: List of roles assigned to the user
-          items:
-            type: string
-          example: [ "USER", "ADMIN" ]
-
-    SignUpRequest:
-      type: object
+        - confirmPassword
+        - firstName
+        - lastName
       properties:
         firstName:
           type: string
@@ -584,12 +981,59 @@ components:
           maxLength: 2048
           description: Optional URL to the user's profile image
           example: https://example.com/images/johndoe.jpg
-      required:
-        - email
-        - password
-        - confirmPassword
-        - firstName
-        - lastName
+
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          maxLength: 100
+          example: John
+        lastName:
+          type: string
+          maxLength: 100
+          example: Doe
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{1,20}$'
+          maxLength: 20
+          example: +15551234567
+        imageUrl:
+          type: string
+          maxLength: 2048
+          example: https://example.com/images/johndoe.jpg
+
+    CreateUserRequest:
+      type: object
+      properties:
+        firstName:
+          type: string
+          description: The user's first name
+          maxLength: 100
+          example: John
+        lastName:
+          type: string
+          description: The user's last name
+          maxLength: 100
+          example: Doe
+        phoneNumber:
+          type: string
+          pattern: '^\+\d{1,20}$'
+          maxLength: 20
+          description: E.164 phone number for the user (e.g. +15551234567)
+          example: +15551234567
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          description: The user's email address
+          example: user@example.com
+        roles:
+          type: array
+          description: List of roles assigned to the user
+          items:
+            type: string
+          example: ["USER", "ADMIN"]
 
     VerifyEmailRequest:
       type: object
@@ -624,7 +1068,7 @@ components:
           type: string
           pattern: '^\d{6}$'
           description: 6-digit SMS verification code
-          example: 123456
+          example: "123456"
 
     ResendVerificationRequest:
       type: object
@@ -712,43 +1156,15 @@ components:
           description: Timestamp when the user last logged in
           example: '2024-01-15T08:30:00Z'
 
-    TokenResponse:
-      type: object
-      properties:
-        refreshToken:
-          type: string
-          description: The JWT token
-          example: eyJ0eXAiOiJyZWZyZXNoX3Rva2VuIiwiYWxnIjoiSFM1MTIifQ.eyJzdWIiOiIyYTNlMGI1Yy0yMTkyLTQ2MTItOWUwMi02OTM5ODlkYmI3ZTUiLCJlbWFpbCI6ImRpbWFAdGVzdC5jb20iLCJyb2xlcyI6WyJVU0VSIl0sInVzZXJfbmFtZSI6IkRpbWEgTWlzaGNoZW5rbyIsImlhdCI6MTcyNjA4Njg2OSwiZXhwIjoxNzI2MTczMjY5fQ.CXzPiYXtC8ORdDuLRJW_OPCv7K-VpuvWztEENnpfu5HlIZUOw7FA2-uUAjpEOKnytKk-cI_1EuP7L97pvqNrsw
-        accessToken:
-          type: string
-          description: The JWT token
-          example: eyJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyYTNlMGI1Yy0yMTkyLTQ2MTItOWUwMi02OTM5ODlkYmI3ZTUiLCJlbWFpbCI6ImRpbWFAdGVzdC5jb20iLCJyb2xlcyI6WyJVU0VSIl0sInVzZXJfbmFtZSI6IkRpbWEgTWlzaGNoZW5rbyIsImlhdCI6MTcyNjA4Njg2OSwiZXhwIjoxNzI2MDg3NDY5fQ.JlBrDUBzosO1k-vpODQF6xfhSyn-E7jj1VjxFPyYU50PwP0u0a9u2E3-7WNLq_kb5XgQ3Y0rRzmqFO-TmT1Wng
-
-    AccessTokenResponse:
-      type: object
-      properties:
-        accessToken:
-          type: string
-          description: The JWT token
-          example: eyJ0eXAiOiJhY2Nlc3NfdG9rZW4iLCJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyYTNlMGI1Yy0yMTkyLTQ2MTItOWUwMi02OTM5ODlkYmI3ZTUiLCJlbWFpbCI6ImRpbWFAdGVzdC5jb20iLCJyb2xlcyI6WyJVU0VSIl0sInVzZXJfbmFtZSI6IkRpbWEgTWlzaGNoZW5rbyIsImlhdCI6MTcyNjA4Njg2OSwiZXhwIjoxNzI2MDg3NDY5fQ.JlBrDUBzosO1k-vpODQF6xfhSyn-E7jj1VjxFPyYU50PwP0u0a9u2E3-7WNLq_kb5XgQ3Y0rRzmqFO-TmT1Wng
-
-    UserProfileUpdateRequest:
-      type: object
-      properties:
-        firstName:
-          type: string
-          example: John
-        lastName:
-          type: string
-          example: Doe
-        phoneNumber:
-          type: string
-          pattern: '^\+\d{1,20}$'
-          maxLength: 20
-
-        imageUrl:
-          type: string
-          example: https://example.com/images/johndoe.jpg
+    UsersPagedResponse:
+      allOf:
+        - $ref: '.gen/common-api.yaml#/components/schemas/PaginationMeta'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/UserInfo'
 
     ChangePasswordRequest:
       type: object

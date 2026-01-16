@@ -98,7 +98,6 @@ public class UserActionTokenService {
             Claims claims = tokenProvider.getAllClaims(token);
             String actionType = claims.get(ACTION_TYPE_CLAIM, String.class);
             String tokenEmail = claims.get(EMAIL_CLAIM, String.class);
-            String tokenId = claims.get(TOKEN_ID_CLAIM, String.class);
             
             if (!UserActionType.EMAIL_VERIFICATION.name().equals(actionType)) {
                 return false;

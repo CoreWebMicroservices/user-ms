@@ -25,17 +25,18 @@ spring:
       enabled: true
       path: /h2-console
 
-  # JWT Configuration for testing
   security:
     jwt:
+      algorithm: HS256
       secretKey: dGVzdC1zZWNyZXQta2V5LWZvci1qd3QtdG9rZW4tZ2VuZXJhdGlvbi1pbi10ZXN0cy1lbnZpcm9ubWVudC1vbmx5LXRoaXMtaXMtYS1sb25nLWVub3VnaC1rZXktZm9yLUhTMjU2
-      refreshExpirationTimeInMinutes: 1440 # 24 hours
-      accessExpirationTimeInMinutes: 60   # 1 hour
+      issuer: corems
+      keyId: test-key-1
+      refreshExpirationTimeInMinutes: 1440
+      accessExpirationTimeInMinutes: 60
 
 userms:
   base-url: http://localhost:${server.port:4000}
 
-# Logging configuration
 logging:
   level:
     com.corems.userms: DEBUG
@@ -45,7 +46,6 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     root: INFO
 
-# Disable security for easier testing (can be enabled for specific tests)
 management:
   endpoints:
     web:
