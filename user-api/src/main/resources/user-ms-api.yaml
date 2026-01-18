@@ -544,10 +544,10 @@ paths:
                 $ref: '#/components/schemas/UserInfo'
         <<: *common-error-responses
     
-    put:
+    patch:
       tags:
         - Admin
-      summary: Update a user by ID
+      summary: Update a user by ID (partial update)
       operationId: updateUserById
       parameters:
         - name: userId
@@ -1137,6 +1137,7 @@ components:
         roles:
           type: array
           description: List of roles assigned to the user
+          nullable: true
           items:
             type: string
           example: ["USER", "ADMIN"]
