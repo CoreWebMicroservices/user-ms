@@ -12,6 +12,7 @@ SET search_path TO user_ms;
 -- ----------------------------------------------------------------------------
 INSERT INTO app_user (uuid, provider, email, first_name, last_name, password) VALUES
     -- Admins (5)
+    ('10000000-0000-0000-0000-000000000001'::uuid, 'local', 'super@corems.local', 'Super', 'Admin', '$2a$10$qdt5KNdDULqFsZi30vj38ePzMkUi1t2NtHnL3jgpTTk0p3ElLyOoq'),
     ('20000000-0000-0000-0000-000000000001'::uuid, 'local', 'admin@corems.local', 'Admin', 'User', '$2a$10$qdt5KNdDULqFsZi30vj38ePzMkUi1t2NtHnL3jgpTTk0p3ElLyOoq'),
     ('20000000-0000-0000-0000-000000000002'::uuid, 'local', 'john.admin@corems.local', 'John', 'Admin', '$2a$10$qdt5KNdDULqFsZi30vj38ePzMkUi1t2NtHnL3jgpTTk0p3ElLyOoq'),
     ('20000000-0000-0000-0000-000000000003'::uuid, 'local', 'sarah.admin@corems.local', 'Sarah', 'Admin', '$2a$10$qdt5KNdDULqFsZi30vj38ePzMkUi1t2NtHnL3jgpTTk0p3ElLyOoq'),
@@ -58,6 +59,12 @@ DELETE FROM app_user_role WHERE user_id IN (
 -- ----------------------------------------------------------------------------
 -- Role assignments based on CoreMsRoles enum
 -- ----------------------------------------------------------------------------
+
+
+-- Super Admin user: all admin roles
+INSERT INTO app_user_role (user_id, name)
+SELECT id, role FROM app_user, (VALUES ('SUPER_ADMIN')) AS roles(role) 
+WHERE email = 'super@corems.local';
 
 -- Admin user: all admin roles
 INSERT INTO app_user_role (user_id, name)
