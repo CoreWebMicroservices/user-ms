@@ -1,12 +1,6 @@
 package com.corems.userms.client;
 
 import com.corems.userms.ApiClient;
-import com.corems.userms.client.AdminApi;
-import com.corems.userms.client.OAuth2Api;
-import com.corems.userms.client.OidcApi;
-import com.corems.userms.client.PasswordApi;
-import com.corems.userms.client.ProfileApi;
-import com.corems.userms.client.RegistrationApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
