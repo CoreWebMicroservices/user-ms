@@ -169,6 +169,7 @@ public class UserService {
 
     private UserInfo mapToUserInfo(UserEntity user) {
         UserInfo userInfo = new UserInfo()
+                .userId(user.getUuid())
                 .firstName(user.getFirstName())
                 .lastName(user.getLastName())
                 .email(user.getEmail())
@@ -177,7 +178,6 @@ public class UserService {
 
         if (SecurityUtils.hasRole(CoreMsRoles.USER_MS_ADMIN)) {
             userInfo
-                    .userId(user.getUuid())
                     .provider(user.getProvider())
                     .roles(user.getRoles().stream().map(RoleEntity::getName).toList())
                     .emailVerified(user.getEmailVerified())
