@@ -24,3 +24,12 @@ app:
     expiration-minutes: 1440
   password-reset:
     expiration-minutes: 1440
+
+notifications:
+  email-templates:
+    welcome: ${TEMPLATE_ID_WELCOME:}
+    email-verification: ${TEMPLATE_ID_EMAIL_VERIFICATION:}
+    password-reset: ${TEMPLATE_ID_PASSWORD_RESET:}
+  sms-templates:
+    welcome: ${TEMPLATE_ID_SMS_WELCOME:}
+    verification-code: ${TEMPLATE_ID_SMS_VERIFICATION:}

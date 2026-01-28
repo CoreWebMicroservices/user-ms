@@ -2,6 +2,7 @@ package com.corems.userms.app.service;
 
 import com.corems.communicationms.api.model.EmailNotificationRequest;
 import com.corems.communicationms.api.model.SmsNotificationRequest;
+import com.corems.communicationms.api.model.TemplateRequest;
 import com.corems.communicationms.client.NotificationsApi;
 import com.corems.userms.app.entity.UserEntity;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -19,6 +22,21 @@ public class NotificationService {
     @Value("${app.frontend.base-url}")
     private String frontendBaseUrl;
     
+    @Value("${notifications.email-templates.welcome:}")
+    private String welcomeEmailTemplateId;
+    
+    @Value("${notifications.email-templates.email-verification:}")
+    private String emailVerificationTemplateId;
+    
+    @Value("${notifications.email-templates.password-reset:}")
+    private String passwordResetTemplateId;
+    
+    @Value("${notifications.sms-templates.welcome:}")
+    private String welcomeSmsTemplateId;
+    
+    @Value("${notifications.sms-templates.verification-code:}")
+    private String verificationCodeTemplateId;
+    
     private static final String EMAIL_VERIFICATION_PATH = "/verify-email";
     private static final String PASSWORD_RESET_PATH = "/reset-password";
 
@@ -28,10 +46,22 @@ public class NotificationService {
             EmailNotificationRequest request = new EmailNotificationRequest();
             request.setSubject("Welcome to CoreMS");
             request.setRecipient(user.getEmail());
-            request.setBody("Dear " + user.getFirstName() + ",\n\n" +
-                    "Welcome to CoreMS! We're excited to have you on board.\n\n" +
-                    "Best regards,\n" +
-                    "The CoreMS Team");
+            
+            if (!welcomeEmailTemplateId.isBlank()) {
+                TemplateRequest templateRequest = new TemplateRequest();
+                templateRequest.setTemplateId(welcomeEmailTemplateId);
+                templateRequest.setParams(Map.of(
+                    "firstName", user.getFirstName(),
+                    "lastName", user.getLastName(),
+                    "appUrl", frontendBaseUrl
+                ));
+                request.setTemplate(templateRequest);
+            } else {
+                request.setBody("Dear " + user.getFirstName() + ",\n\n" +
+                        "Welcome to CoreMS! We're excited to have you on board.\n\n" +
+                        "Best regards,\n" +
+                        "The CoreMS Team");
+            }
 
             var res = notificationsApi.sendEmailNotification(request);
 
@@ -51,7 +81,19 @@ public class NotificationService {
         try {
             SmsNotificationRequest request = new SmsNotificationRequest();
             request.setPhoneNumber(user.getPhoneNumber());
-            request.setMessage("Welcome to CoreMS, " + user.getFirstName() + "!");
+            
+            if (!welcomeSmsTemplateId.isBlank()) {
+                TemplateRequest templateRequest = new TemplateRequest();
+                templateRequest.setTemplateId(welcomeSmsTemplateId);
+                templateRequest.setParams(Map.of(
+                    "firstName", user.getFirstName(),
+                    "lastName", user.getLastName(),
+                    "appUrl", frontendBaseUrl
+                ));
+                request.setTemplate(templateRequest);
+            } else {
+                request.setMessage("Welcome to CoreMS, " + user.getFirstName() + "!");
+            }
 
             var res = notificationsApi.sendSmsNotification(request);
 
@@ -69,13 +111,25 @@ public class NotificationService {
             EmailNotificationRequest request = new EmailNotificationRequest();
             request.setSubject("Verify Your Email Address");
             request.setRecipient(email);
-            request.setBody("Dear " + firstName + ",\n\n" +
-                    "Please verify your email address by clicking the link below:\n\n" +
-                    verificationUrl + "\n\n" +
-                    "This link will expire in 24 hours.\n\n" +
-                    "If you didn't create an account with us, please ignore this email.\n\n" +
-                    "Best regards,\n" +
-                    "The CoreMS Team");
+            
+            if (!emailVerificationTemplateId.isBlank()) {
+                TemplateRequest templateRequest = new TemplateRequest();
+                templateRequest.setTemplateId(emailVerificationTemplateId);
+                templateRequest.setParams(Map.of(
+                    "firstName", firstName,
+                    "verificationUrl", verificationUrl
+                ));
+                request.setTemplate(templateRequest);
+                request.setEmailType(EmailNotificationRequest.EmailTypeEnum.HTML);
+            } else {
+                request.setBody("Dear " + firstName + ",\n\n" +
+                        "Please verify your email address by clicking the link below:\n\n" +
+                        verificationUrl + "\n\n" +
+                        "This link will expire in 24 hours.\n\n" +
+                        "If you didn't create an account with us, please ignore this email.\n\n" +
+                        "Best regards,\n" +
+                        "The CoreMS Team");
+            }
 
             var res = notificationsApi.sendEmailNotification(request);
 
@@ -90,7 +144,18 @@ public class NotificationService {
         try {
             SmsNotificationRequest request = new SmsNotificationRequest();
             request.setPhoneNumber(phoneNumber);
-            request.setMessage("Hi " + firstName + "! Your CoreMS verification code is: " + code + ". Valid for 10 minutes.");
+            
+            if (!verificationCodeTemplateId.isBlank()) {
+                TemplateRequest templateRequest = new TemplateRequest();
+                templateRequest.setTemplateId(verificationCodeTemplateId);
+                templateRequest.setParams(Map.of(
+                    "firstName", firstName,
+                    "code", code
+                ));
+                request.setTemplate(templateRequest);
+            } else {
+                request.setMessage("Hi " + firstName + "! Your CoreMS verification code is: " + code + ". Valid for 10 minutes.");
+            }
 
             var res = notificationsApi.sendSmsNotification(request);
 
@@ -108,13 +173,25 @@ public class NotificationService {
             EmailNotificationRequest request = new EmailNotificationRequest();
             request.setSubject("Password Reset Request");
             request.setRecipient(user.getEmail());
-            request.setBody("Dear " + user.getFirstName() + ",\n\n" +
-                    "You have requested to reset your password. Please click the link below to reset your password:\n\n" +
-                    resetUrl + "\n\n" +
-                    "This link will expire in 24 hours.\n\n" +
-                    "If you didn't request a password reset, please ignore this email and your password will remain unchanged.\n\n" +
-                    "Best regards,\n" +
-                    "The CoreMS Team");
+            
+            if (!passwordResetTemplateId.isBlank()) {
+                TemplateRequest templateRequest = new TemplateRequest();
+                templateRequest.setTemplateId(passwordResetTemplateId);
+                templateRequest.setParams(Map.of(
+                    "firstName", user.getFirstName(),
+                    "resetUrl", resetUrl
+                ));
+                request.setTemplate(templateRequest);
+                request.setEmailType(EmailNotificationRequest.EmailTypeEnum.HTML);
+            } else {
+                request.setBody("Dear " + user.getFirstName() + ",\n\n" +
+                        "You have requested to reset your password. Please click the link below to reset your password:\n\n" +
+                        resetUrl + "\n\n" +
+                        "This link will expire in 24 hours.\n\n" +
+                        "If you didn't request a password reset, please ignore this email and your password will remain unchanged.\n\n" +
+                        "Best regards,\n" +
+                        "The CoreMS Team");
+            }
 
             var res = notificationsApi.sendEmailNotification(request);
 
