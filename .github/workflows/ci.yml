@@ -1,5 +1,6 @@
 name: CI
 
+# Triggers on push to main/develop or pull requests
 on:
   push:
     branches:
